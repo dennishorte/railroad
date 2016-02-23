@@ -1,5 +1,5 @@
-var Util = {};
 
+var Util = {};
 (function() {
     Util.assert = function(condition, message) {
         if (!condition) {
@@ -145,29 +145,6 @@ var Game = {};
         return game_state;
     };
 
-    // Public API
-    Game.bid_for_first_seat = function(game_state, player_id, amount) {
-        Util.assert(Game.is_bidding_round(game_state), "Not a bidding round.");
-        Util.assert(Game.get_current_player(game_state).id == player_id, "Not the current player.");
-        
-        var top_bid = Game.get_top_bid(game_state);
-        Util.assert(top_bid < amount, "Bid is not higher than previous build.");
-
-        var player = Game.get_player_by_id(game_state, player_id);
-        Player.set_bid(player, amount);
-
-        Game.next_bidder(game_state);
-    };
-
-    // Public API
-    Game.pass_bidding = function(game_state, player_id) {
-        Util.assert(Game.is_bidding_round(game_state), "Not a bidding round.");
-
-        var player = Game.get_player_by_id(game_state, player_id);
-        Util.assert(Game.get_current_player(game_state).id == player_id, "Not the current player.");
-        Player.set_passed_bidding(player);
-        Game.next_bidder(game_state);
-    };
 
     Game.next_bidder = function(game_state) {
         Util.assert(Game.is_bidding_round(game_state), "Not a bidding round.");
@@ -321,4 +298,33 @@ var Game = {};
     };
 
     exports.Game = Game;
+}());
+
+var Action = {};
+(function() {
+    // Public API
+    Action.bid_for_first_seat = function(game_state, player_id, amount) {
+        Util.assert(Game.is_bidding_round(game_state), "Not a bidding round.");
+        Util.assert(Game.get_current_player(game_state).id == player_id, "Not the current player.");
+        
+        var top_bid = Game.get_top_bid(game_state);
+        Util.assert(top_bid < amount, "Bid is not higher than previous build.");
+
+        var player = Game.get_player_by_id(game_state, player_id);
+        Player.set_bid(player, amount);
+
+        Game.next_bidder(game_state);
+    };
+
+    // Public API
+    Action.pass_bidding = function(game_state, player_id) {
+        Util.assert(Game.is_bidding_round(game_state), "Not a bidding round.");
+
+        var player = Game.get_player_by_id(game_state, player_id);
+        Util.assert(Game.get_current_player(game_state).id == player_id, "Not the current player.");
+        Player.set_passed_bidding(player);
+        Game.next_bidder(game_state);
+    };
+
+    exports.Action = Action;
 }());
