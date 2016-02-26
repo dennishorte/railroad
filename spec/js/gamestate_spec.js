@@ -1,8 +1,44 @@
-var rail_root = require("../../src/gamestate");
-var raila = rail_root.Action;
-var railg = rail_root.Game;
-var railp = rail_root.Player;
-var railf = rail_root.Factory;
+var root = require("../../src/gamestate");
+var raila = root.Action;
+var railc = root.City;
+var railf = root.Factory;
+var railg = root.Game;
+var railm = root.Map;
+var railp = root.Player;
+
+describe("Map", function() {
+    var map;
+    beforeEach(function() {
+        var city0 = railf.City();
+        city0.size = 3;
+        city0.color = root.Color.colors.Yellow;
+
+        var city1 = railf.City();
+        city1.size = 4;
+        city1.color = root.Color.colors.Red;
+
+        map = railf.Map();
+        railm.Builder.initialize_terrain(map, 5, 5);
+        railm.Builder.insert_city(map, city0, 2, 2);
+        railm.Builder.insert_city(map, city1, 4, 3);
+
+        // Ensure the map we set up is valid.
+        railm.check_city_ids(map);
+        railm.check_city_locations(map);
+    });
+
+    describe("seed_cubes", function() {
+        it("adds cubes to each city equal to that city's size", function() {
+            railm.seed_cubes(map);
+
+            var cities = railm.get_cities(map);
+            for (var i = 0; i < cities.length; i++) {
+                var num_cubes = railc.num_cubes_remaining(cities[i]);
+                expect(num_cubes).toEqual(railc.get_size(cities[i]));
+            }
+        });
+    });
+});
 
 describe("new_game", function() {
     var settings;
@@ -10,6 +46,7 @@ describe("new_game", function() {
     beforeEach(function() {
         settings = railf.Settings();
         settings.players = [7, 2, 3];
+        settings.map = railf.Map();
     });
 
     it("requires a settings object", function() {
@@ -71,6 +108,7 @@ describe("bidding", function() {
     beforeEach(function() {
         var settings = railf.Settings();
         settings.players = [2, 4, 9];
+        settings.map = railf.Map();
         game = railg.new_game(settings);
     });
 
@@ -102,13 +140,15 @@ describe("bidding", function() {
     // Each test is run with the starting player being either the first, middle, or
     // last seat.
     describe("next_bidder", function() {
+        var settings = railf.Settings();
+        settings.players = [2, 4, 9];
+        settings.map = railf.Map();
+
         it("advances the current seat", function() {
             var num_seats = 3;
             expect(railg.get_num_seats(game)).toEqual(num_seats);
             for (var i = 0; i < num_seats; i++) {
                 // Reset the game state.
-                var settings = railf.Settings();
-                settings.players = [2, 4, 9];
                 game = railg.new_game(settings);
                 game.first_seat = i;
                 game.current_seat = i;
@@ -125,8 +165,6 @@ describe("bidding", function() {
             expect(railg.get_num_seats(game)).toEqual(num_seats);
             for (var i = 0; i < num_seats; i++) {
                 // Set up the game state.
-                var settings = railf.Settings();
-                settings.players = [2, 4, 9];
                 game = railg.new_game(settings);
                 game.first_seat = i;
                 game.current_seat = i;
@@ -146,9 +184,6 @@ describe("bidding", function() {
             expect(railg.get_num_seats(game)).toEqual(num_seats);
             for (var i = 0; i < num_seats; i++) {
                 // Set up the game state.
-                var settings = railf.Settings();
-                settings.players = [2, 4, 9];
-                game = railg.new_game(settings);
                 game.first_seat = i;
                 game.current_seat = i;
                 var seats = railg.get_seats(game);
@@ -169,8 +204,6 @@ describe("bidding", function() {
             expect(railg.get_num_seats(game)).toEqual(num_seats);
             for (var i = 0; i < num_seats; i++) {
                 // Set up the game state.
-                var settings = railf.Settings();
-                settings.players = [2, 4, 9];
                 game = railg.new_game(settings);
                 game.first_seat = i;
                 game.current_seat = i;
@@ -345,6 +378,24 @@ describe("bidding", function() {
             game.round = 1;
             var player = railg.get_current_player(game);
             expect(function() { raila.pass_bidding(game, player.id); }).toThrow();
+        });
+    });
+
+    describe("build_track", function() {
+        beforeEach(function() {
+
+        });
+
+        it("works only for the current player", function() {
+            var next_player = railg.get_next_player(game);
+            expect(function() { raila.build_track(game, next_player.id, []); }).toThrow();
+
+            var current_player = railg.get_current_player(game);
+            expect(function() { raila.build_track(game, current_player.id, []); }).not.toThrow();
+        });
+
+        it("requires a minimum path size of 3", function() {
+            
         });
     });
 

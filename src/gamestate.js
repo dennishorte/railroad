@@ -23,6 +23,10 @@ var Util = {};
         throw message; // Fallback
     };
 
+    Util.random_element = function(array) {
+        return array[Util.random_int(array.length)];
+    };
+
     Util.random_int = function(max) {
         return Math.floor(Math.random() * max);
     };
@@ -47,9 +51,47 @@ var Util = {};
 
 var Factory = {};
 (function() {
+    Factory.Hex = function(row, col) {
+        return {
+            row: row,
+            col: col,
+        };
+    };
+
+    Factory.Cubes = function() {
+        var dict = {};
+        for (var i = 0; i < Color.cubes.length; i++) {
+            dict[Color.cubes[i]] = 0;
+        }
+        return dict;
+    };
+
+    Factory.City = function() {
+        return {
+            id    : -1,
+            name  : "",
+            row   : -1,   // Position on the map.
+            col   : -1,   // Position on the map.
+            size  : -1,   // Number of cubes it starts with.
+            color : Color.colors.INVALID,
+            cubes : Factory.Cubes(),
+            western_link: City.WesternLinkState.NONE,
+        };
+    };
+
+    Factory.Map = function() {
+        return {
+            rows: 0,
+            cols: 0,
+            hexes: [],
+            cities: [],  // Index equals id.
+        };
+    };
+
     Factory.Settings = function() {
         return {
             players: [],
+            map: {},
         };
     };
 
@@ -76,6 +118,188 @@ var Factory = {};
     }
 
     exports.Factory = Factory;
+}());
+
+var Color = {};
+(function() {
+    Color.colors = {
+        INVALID: 0,
+        RED    : 1,
+        YELLOW : 2,
+        BLUE   : 3,
+        PURPLE : 4,
+        BLACK  : 5,
+        GRAY   : 6,
+        WEST   : 7,  // For western link cubes
+        properties : {
+            0: { name: "invalid" },
+            1: { name: "red"     },
+            2: { name: "yellow"  },
+            3: { name: "blue"    },
+            4: { name: "purple"  },
+            5: { name: "black"   },
+            6: { name: "gray"    },
+            7: { name: "west"    },
+        },
+    };
+
+    // The colors that can be seeded onto cities as random cubes.
+    // This doesn't include the WEST color, although that is a cube type, because it cannot
+    // be placed as a random cube.
+    Color.random_cubes = [
+        Color.colors.RED,
+        Color.colors.YELLOW,
+        Color.colors.BLUE,
+        Color.colors.PURPLE,
+        Color.colors.BLACK,
+    ];
+
+    // All possible cube colors.
+    Color.cubes = [
+        Color.colors.RED,
+        Color.colors.YELLOW,
+        Color.colors.BLUE,
+        Color.colors.PURPLE,
+        Color.colors.BLACK,
+        Color.colors.WEST,
+    ];
+
+    exports.Color = Color;
+}());
+
+var City = {};
+(function() {
+    City.WesternLinkState = {
+        NONE    : 0,
+        POSSIBLE: 1,
+        BUILT   : 2,
+    };
+    
+    /**
+     @return the location of the city as a hex dict.
+     */
+    City.get_hex = function(city) {
+        return {
+            row: city.row,
+            col: city.col,
+        };
+    };
+
+    City.get_size = function(city) {
+        return city.size;
+    };
+
+    City.num_cubes_remaining = function(city) {
+        var count = 0;
+        for (var i = 0; i < Color.cubes.length; i++) {
+            count += city.cubes[Color.cubes[i]];
+        }
+        return count;
+    };
+
+    exports.City = City;
+}());
+
+var Map = {};
+(function() {
+    Map.Terrain = {
+        INVALID : 0,
+        CITY    : 1,
+        RIVER   : 2,
+        OCEAN   : 3,
+        PLAINS  : 4,
+        HILLS   : 5,
+
+        /**
+         name: A human-readable string representing the type of terrain.
+         cost: The amount of cash required to build a track on that terrain. null means no
+               building is possible.
+         */
+        properties : {
+            0: { name: "invalid", cost: null },
+            1: { name: "city"   , cost: null },
+            2: { name: "river"  , cost: 3    },
+            3: { name: "ocean"  , cost: null },
+            4: { name: "plains" , cost: 2    },
+            5: { name: "hills"  , cost: 4    },
+        },
+    };
+
+    /**
+     Test that the city ids all line up correctly with the array indices that hold them.
+     */
+    Map.check_city_ids = function(map) {
+        for (var i = 0; i < Map.num_cities(map); i++) {
+            Util.assert(map.cities[i].id == i, "Invalid city id.");
+        }
+    };
+
+    /**
+     Test that the location of each city on the map corresponds to a city in its cities list.
+     */
+    Map.check_city_locations = function(map) {
+        for (var i = 0; i < Map.num_cities(map); i++) {
+            var city = map.cities[i];
+            Util.assert(Map.is_city(map, City.get_hex(city)), "City terrain type is incorrect.");
+        }
+    };
+
+    Map.get_cities = function(map) {
+        return map.cities;
+    };
+
+    Map.get_city_by_id = function(map, city_id) {
+        return map.cities[city_id];
+    };
+
+    Map.get_terrain = function(map, hex) {
+        return map.hexes[hex.row][hex.col];
+    };
+
+    Map.num_cities = function(map) {
+        return map.cities.length;
+    };
+
+    Map.seed_cubes = function(map) {
+        for (var i = 0; i < Map.num_cities(map); i++) {
+            var city = map.cities[i];
+            for (var j = 0; j < City.get_size(city); j++) {
+                var color = Util.random_element(Color.random_cubes);
+                city.cubes[color] += 1;
+            }
+        }
+    };
+
+    Map.is_city = function(map, hex) {
+        return Map.get_terrain(map, hex) == Map.Terrain.CITY;
+    };
+
+    exports.Map = Map;
+}());
+
+(function() {
+    Map.Builder = {};
+
+    Map.Builder.initialize_terrain = function(map, rows, cols) {
+        Util.assert(map.hexes.length == 0, "Terrain has already been initialized.");
+        map.rows = rows;
+        map.cols = cols;
+        for (var row = 0; row < rows; row++) {
+            map.hexes.push([]);
+            for (var col = 0; col < cols; col++) {
+                map.hexes[row].push(Map.Terrain.PLAINS);
+            }
+        }
+    };
+
+    Map.Builder.insert_city = function(map, city, row, col) {
+        Util.assert(row < map.rows && col < map.cols, "Invalid position for city.");
+        city.row = row;
+        city.col = col;
+        city.id = map.cities.length;
+        map.cities.push(city);
+        map.hexes[row][col] = Map.Terrain.CITY;
+    };
 }());
 
 var Player = {};
@@ -141,6 +365,12 @@ var Game = {};
 
         // Randomize the player order.
         Util.shuffle(game_state.players);
+
+        // Initialize the map from the template.
+        Map.check_city_ids(settings.map);
+        Map.check_city_locations(settings.map);
+        game_state.map = settings.map;
+        Map.seed_cubes(game_state.map);
 
         return game_state;
     };
@@ -297,6 +527,11 @@ var Game = {};
         return game_state.players.length;
     };
 
+    Game.ensure_player_turn = function(game_state, player_id) {
+        var current_player = Game.get_current_player(game_state);
+        Util.assert(current_player.id == player_id, "It is not this player's turn.");
+    };
+
     exports.Game = Game;
 }());
 
@@ -324,6 +559,10 @@ var Action = {};
         Util.assert(Game.get_current_player(game_state).id == player_id, "Not the current player.");
         Player.set_passed_bidding(player);
         Game.next_bidder(game_state);
+    };
+
+    Action.build_track = function(game_state, player_id, path) {
+        Game.ensure_player_turn(game_state, player_id);
     };
 
     exports.Action = Action;
