@@ -1,5 +1,24 @@
 
-var Util = {};
+var Action  = {};
+var City    = {};
+var Color   = {};
+var Factory = {};
+var Game    = {};
+var Map     = {};
+var Player  = {};
+var Util    = {};
+
+(function() {
+    exports.Action  = Action;
+    exports.City    = City;
+    exports.Color   = Color;
+    exports.Factory = Factory;
+    exports.Game    = Game;
+    exports.Map     = Map;
+    exports.Player  = Player;
+    exports.Util    = Util;
+}());
+
 (function() {
     Util.assert = function(condition, message) {
         if (!condition) {
@@ -23,15 +42,29 @@ var Util = {};
         throw message; // Fallback
     };
 
-    Util.random_element = function(array) {
-        return array[Util.random_int(array.length)];
-    };
-
     Util.random_int = function(max) {
         return Math.floor(Math.random() * max);
     };
 
-    Util.shuffle = function (array) {
+
+
+    Util.Array = {};
+
+    Util.Array.remove = function(array, element) {
+        var index = array.indexOf(element);
+        if (index == -1) {
+            return array;
+        }
+        else {
+            return array.splice(index, 1);  // In place, but return the value for chaining.
+        }
+    };
+
+    Util.Array.select = function(array) {
+        return array[Util.random_int(array.length)];
+    };
+
+    Util.Array.shuffle = function (array) {
         var currentIndex = array.length;
         var temporaryValue, randomIndex;
 
@@ -46,10 +79,8 @@ var Util = {};
         return array;
     };
 
-    exports.Util = Util;
 }());
 
-var Factory = {};
 (function() {
     Factory.Hex = function(row, col) {
         return {
@@ -79,6 +110,13 @@ var Factory = {};
         };
     };
 
+    /**
+     The hexes in a map should always be designed to that the even rows are offset to the
+     right from the odd rows. eg.
+       0,0  0,1  0,2
+         1,0  1,1  1,2
+       2,0  2,1  2,2
+     */
     Factory.Map = function() {
         return {
             rows: 0,
@@ -107,9 +145,19 @@ var Factory = {};
         };
     };
 
+    Factory.Track = function() {
+        return {
+            id       : -1,
+            owner    : -1,
+            path     : [],
+            complete : false,
+        };
+    };
+
     Factory.GameState = function() {
         return {
-            players: [],         // An array of player objects.
+            players       : [],  // An array of player objects.
+            tracks        : [],  // An array of track objects.
             first_seat    :  0,  // changes each turn
             current_seat  :  0,
             round         :  0,  // 3 rounds per turn + round 0 = bidding for first player
@@ -117,10 +165,8 @@ var Factory = {};
         };
     }
 
-    exports.Factory = Factory;
 }());
 
-var Color = {};
 (function() {
     Color.colors = {
         INVALID: 0,
@@ -164,10 +210,8 @@ var Color = {};
         Color.colors.WEST,
     ];
 
-    exports.Color = Color;
 }());
 
-var City = {};
 (function() {
     City.WesternLinkState = {
         NONE    : 0,
@@ -197,10 +241,11 @@ var City = {};
         return count;
     };
 
-    exports.City = City;
 }());
 
-var Map = {};
+(function() {
+}());
+
 (function() {
     Map.Terrain = {
         INVALID : 0,
@@ -223,6 +268,58 @@ var Map = {};
             4: { name: "plains" , cost: 2    },
             5: { name: "hills"  , cost: 4    },
         },
+    };
+
+    Map.Direction = {
+        INVALID: 0,
+        NE : (1 << 0),
+        E  : (1 << 1),
+        SE : (1 << 2),
+        SW : (1 << 3),
+        W  : (1 << 4),
+        NW : (1 << 5),
+    };
+
+    Map.Direction.reverse = {};
+    Map.Direction.reverse[Map.Direction.NE] = Map.Direction.SW;
+    Map.Direction.reverse[Map.Direction.E ] = Map.Direction.W;
+    Map.Direction.reverse[Map.Direction.SE] = Map.Direction.NW;
+    Map.Direction.reverse[Map.Direction.SW] = Map.Direction.NE;
+    Map.Direction.reverse[Map.Direction.W ] = Map.Direction.E;
+    Map.Direction.reverse[Map.Direction.NW] = Map.Direction.SE;
+
+    Map.Direction.adjacent = {};
+    Map.Direction.adjacent[Map.Direction.NE] = [Map.Direction.NW, Map.Direction.E ];
+    Map.Direction.adjacent[Map.Direction.E ] = [Map.Direction.NE, Map.Direction.SE];
+    Map.Direction.adjacent[Map.Direction.SE] = [Map.Direction.E , Map.Direction.SW];
+    Map.Direction.adjacent[Map.Direction.SW] = [Map.Direction.SE, Map.Direction.W ];
+    Map.Direction.adjacent[Map.Direction.W ] = [Map.Direction.SW, Map.Direction.NW];
+    Map.Direction.adjacent[Map.Direction.NW] = [Map.Direction.W , Map.Direction.NE];
+
+    Map.Direction.is_adjacent = function(dir1, dir2) {
+        var adj = Map.Direction.adjacent[dir1];
+        for (var i = 0; i < adj.length; i++) {
+            if (adj[i] == dir2) return true;
+        }
+        return false;
+    };
+
+    /**
+     A train track cannot make a curve that is too sharp. Thus, a E -> W movement, which
+     would turn the train 180 degrees, is not valid, but also E -> SW, which would turn
+     the train 120 degrees is also too sharp. A curve can have a maximum of 60 degrees to
+     be valid.
+     */
+    Map.Direction.is_valid_curve = function(dir1, dir2) {
+        Util.assert(dir1 != Map.Direction.INVALID && dir2 != Map.Direction.INAVLID, "Invalid directions.");
+
+        return dir1 == dir2 || Map.Direction.is_adjacent(dir1, dir2);
+    };
+
+    Map.Hex = {};
+
+    Map.Hex.is_equal = function(hex1, hex2) {
+        return hex1.row == hex2.row && hex1.col == hex2.col
     };
 
     /**
@@ -264,7 +361,7 @@ var Map = {};
         for (var i = 0; i < Map.num_cities(map); i++) {
             var city = map.cities[i];
             for (var j = 0; j < City.get_size(city); j++) {
-                var color = Util.random_element(Color.random_cubes);
+                var color = Util.Array.select(Color.random_cubes);
                 city.cubes[color] += 1;
             }
         }
@@ -274,7 +371,105 @@ var Map = {};
         return Map.get_terrain(map, hex) == Map.Terrain.CITY;
     };
 
-    exports.Map = Map;
+    /**
+     Determine the direction from hex1 to hex2, if they are adjacent. Return invalid if
+     they are not adjacent.
+
+       0,0  0,1  0,2
+         1,0  1,1  1,2
+       2,0  2,1  2,2
+     */
+    Map.adjacency = function(map, hex1, hex2) {
+        var d = Map.Direction;
+        var dr = hex2.row - hex1.row;
+        var dc = hex2.col - hex1.col;
+
+        if (dr == 0) {
+            if (dc == -1) return d.W;
+            if (dc == +1) return d.E;
+            return d.INVALID;
+        }
+
+        if (hex1.row % 2 == 0) {
+            if (dr == -1) {
+                if (dc ==  0) return d.NE;
+                if (dc == -1) return d.NW;
+                return d.INVALID;
+            }
+            if (dr == +1) {
+                if (dc ==  0) return d.SE;
+                if (dc == -1) return d.SW;
+                return d.INVALID;
+            }
+        }
+        else {
+            if (dr == -1) {
+                if (dc == +1) return d.NE;
+                if (dc ==  0) return d.NW;
+                return d.INVALID;
+            }
+            if (dr == +1) {
+                if (dc == +1) return d.SE;
+                if (dc ==  0) return d.SW;
+                return d.INVALID;
+            }
+        }
+        return d.INVALID;
+    };
+
+    Map.is_on_map = function(map, hex) {
+        return 0 <= hex.row && hex.row < map.rows && 0 <= hex.col && hex.col < map.cols;
+    };
+
+    /**
+     This specifically does NOT check the endpoints.
+
+     If the path is not valid, throws an error.
+     */
+    Map.is_valid_path = function(map, path) {
+        Util.assert(path.length > 2, "Path is too short.");
+
+        for (var i = 1; i < path.length - 1; i++) {
+            var hex = path[i];
+
+            Util.assert(
+                0 <= hex.row && hex.row < map.rows &&
+                0 <= hex.col && hex.col < map.cols,
+                "Hex is off the map.");
+
+            Util.assert(
+                !Map.is_city(map, hex),
+                "Path passes through city.");
+
+            Util.assert(
+                Map.get_terrain(map, hex) != Map.Terrain.INVALID,
+                "Path crosses invaid terrain.");
+
+        }
+
+        var prev_adj = null;
+        for (var i = 1; i < path.length; i++) {
+            var prev = path[i - 1];
+            var next = path[i];
+            var adj = Map.adjacency(map, prev, next);
+            Util.assert(adj != Map.Direction.INVALID, "Path is not contiguous.");
+            if (prev_adj != null) {
+                Util.assert(Map.Direction.is_valid_curve(prev_adj, adj), "Invalid curve in path.");
+            }
+            prev_adj = adj;
+        }
+
+        for (var i = 0; i < path.length; i++) {
+            for (var j = i + 1; j < path.length; j++) {
+                Util.assert(!Map.Hex.is_equal(path[i], path[j]), "Path contains loop.");
+            }
+        }
+
+        // ...too many tracks (max two tracks per hex).
+
+        return true;
+    };
+
 }());
 
 (function() {
@@ -302,7 +497,6 @@ var Map = {};
     };
 }());
 
-var Player = {};
 (function() {
     Player.get_bid = function(player) {
         return player.bid;
@@ -340,10 +534,8 @@ var Player = {};
         player.shares += 1;
     };
 
-    exports.Player = Player;
 }());
 
-var Game = {};
 (function() {
     Game.BiddingRound = 0;
     Game.NumRounds    = 3; // Actual number of play rounds (doesn't include bidding).
@@ -364,7 +556,7 @@ var Game = {};
         }
 
         // Randomize the player order.
-        Util.shuffle(game_state.players);
+        Util.Array.shuffle(game_state.players);
 
         // Initialize the map from the template.
         Map.check_city_ids(settings.map);
@@ -428,6 +620,10 @@ var Game = {};
             Util.assert(Player.get_bid(game_state.players[i]) != 0, "This player never made a bid or passed.");
             Player.clear_bid(game_state.players[i]);
         }
+    };
+
+    Game.end_turn = function(game_state, player_id) {
+        Util.not_ready();
     };
 
     Game.pay = function(game_state, player_id, amount) {
@@ -527,15 +723,154 @@ var Game = {};
         return game_state.players.length;
     };
 
+    Game.get_track_array = function(game_state) {
+        return game_state.tracks;
+    };
+
+    Game.get_track_by_id = function(game_state, track_id) {
+        for (var i = 0; i < game_state.tracks.length; i++) {
+            if (game_state.tracks[i].id == track_id) {
+                return game_state.tracks[i];
+            }
+        }
+        Util.assert(false, "Specified id does not match any tracks.");
+    };
+
+    Game.get_tracks_by_hex = function(game_state, hex) {
+        var tracks = [];
+        for (var i = 0; i < game_state.tracks.length; i++) {
+            var track = game_state.tracks[i];
+            var path = track.path;
+            for (var j = 1; j < path.length - 1; j++) { // Don't check endpoints.
+                if (Map.Hex.is_equal(path[j], hex)) {
+                    tracks.push(track);
+                }
+            }
+        }
+        return tracks;
+    };
+
+
+    /**
+     If the two tracks can join together, create a new track object that is the combination
+     of the path of the two tracks. For tracks to join, they must have the same owner. Does
+     not alter the game_state in any way.
+
+     @return
+     
+     */
+    Game.combine_tracks_if_possible = function(game_state, track1, track2) {
+        function can_paths_combine_head_to_head(path1, path2) {
+            return Map.Hex.is_equal(path1[0], path2[1]) && Map.Hex.is_equal(path1[1], path2[0]);
+        };
+
+        if (track1.complete || track2.complete) { return null; }
+        if (track1.owner != track2.owner)       { return null; }
+
+        // Make copies so we can modify them without corrupting the game state.
+        var first = track1.path.slice();
+        var second = track2.path.slice();
+
+        for (var i = 0; i < 4; i++) {
+            switch (i) {
+                case 0:                   break;  // f f
+                case 1: second.reverse(); break;  // f r
+                case 2: first.reverse();  break;  // r r
+                case 3: second.reverse(); break;  // r f
+            };
+
+            if (can_paths_combine_head_to_head(first, second)) {
+
+                // Trim the overlapping end-points, and reverse the first path so that it
+                // will join correctly with the second.
+                first.splice(0, 1);
+                second.splice(0, 1);
+                first.reverse();
+                var new_path = first.concat(second);
+
+                var new_track = Factory.Track();
+                new_track.owner = track1.owner;
+                new_track.path  = new_path;
+                
+                // If the new track has a city at both ends, it is complete.
+                var map = game_state.map;
+                if (Map.is_city(map, new_path[0]) && Map.is_city(map, new_path[new_path.length -1])) {
+                    new_track.complete = true;
+                }
+                return new_track;
+            }
+        }
+
+        return null;
+    };
+
+    Game.get_new_track_id = function(game_state) {
+        var tracks = Game.get_track_array(game_state);
+        return tracks.length == 0 ? 1 : tracks[tracks.length - 1].id + 1;
+    };
+
+    Game.add_track = function(game_state, owner_id, path) {
+        Util.assert(Map.is_valid_path(game_state.map, path), "Invalid track path.");
+        
+        var map = game_state.map;
+
+        // Most tracks connect city to city in one action. We do a short-cut test for that
+        // before trying to extend an existing, incomplete track, or adding this as an
+        // incomplete track.
+
+        var new_track = Factory.Track();
+        new_track.owner    = owner_id;
+        new_track.path     = path;
+        new_track.complete = false;
+
+        if (Map.is_city(map, path[0]) && Map.is_city(map, path[path.length-1])) {
+            new_track.id = Game.get_new_track_id(game_state);
+            game_state.tracks.push(new_track);
+            return;
+        }
+
+        var tracks = Game.get_track_array(game_state);
+        for (var i = 0; i < tracks.length; i++) {
+            var combo_track = Game.combine_tracks_if_possible(game_state, new_track, tracks[i]);
+            if (combo_track !== null) {
+                // Create a local copy of the tracks array so that errors won't corrupt
+                // the game state.
+                var tracks = Game.get_track_array(game_state).slice();
+                Util.Array.remove(tracks, tracks[i]);
+
+                combo_track.id = Game.get_new_track_id(game_state);
+
+                tracks.push(combo_track);
+
+                // Swap the old array with the new one.
+                game_state.tracks = tracks;
+                return;
+            }
+        }
+
+        // If we fall through the previous loop, this new track is guaranteed to have the
+        // following two properties:
+        // - At least one end is not a city.
+        // - It cannot combine with any other tracks.
+        //
+        // Given that, we must assume this track is meant to stand alone. In that case,
+        // the last check to do is that it has at least one end-point on a city.
+        if (Map.is_city(map, path[0]) || Map.is_city(map, path[path.length -1])) {
+            new_track.id = Game.get_new_track_id(game_state);
+            game_state.tracks.push(new_track);
+            return;
+        }
+
+        Util.assert(false, "The new track didn't connect with any cities.");
+    };
+
     Game.ensure_player_turn = function(game_state, player_id) {
         var current_player = Game.get_current_player(game_state);
         Util.assert(current_player.id == player_id, "It is not this player's turn.");
     };
 
-    exports.Game = Game;
 }());
 
-var Action = {};
 (function() {
     // Public API
     Action.bid_for_first_seat = function(game_state, player_id, amount) {
@@ -561,9 +896,20 @@ var Action = {};
         Game.next_bidder(game_state);
     };
 
-    Action.build_track = function(game_state, player_id, path) {
+    // Public API
+    Action.pass_turn = function(game_state, player_id) {
         Game.ensure_player_turn(game_state, player_id);
+        Game.end_turn(game_state, player_id);
     };
 
-    exports.Action = Action;
+    // Public API
+    Action.build_track = function(game_state, player_id, path) {
+        Game.ensure_player_turn(game_state, player_id);
+        Util.assert(path.length >= 3, "No tracks specified.");
+        Util.assert(path.length <= 6, "Only 4 hexes of track can be built at a time.");
+
+        Game.add_track(game_state, player_id, path);
+        Game.end_turn(game_state, player_id);
+    };
+
 }());

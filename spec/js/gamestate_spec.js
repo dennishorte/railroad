@@ -6,6 +6,31 @@ var railg = root.Game;
 var railm = root.Map;
 var railp = root.Player;
 
+function create_test_game_one() {
+    var city0 = railf.City();
+    city0.size = 3;
+    city0.color = root.Color.colors.Yellow;
+
+    var city1 = railf.City();
+    city1.size = 4;
+    city1.color = root.Color.colors.Red;
+
+    var city2 = railf.City();
+    city2.size = 1;
+    city2.color = root.Color.colors.Gray;
+
+    var map = railf.Map();
+    railm.Builder.initialize_terrain(map, 5, 5);
+    railm.Builder.insert_city(map, city0, 0, 2);
+    railm.Builder.insert_city(map, city2, 2, 2);
+    railm.Builder.insert_city(map, city1, 4, 2);
+
+    var settings = railf.Settings();
+    settings.players = [2, 4, 9];
+    settings.map = map;
+    return railg.new_game(settings);
+};
+
 describe("Map", function() {
     var map;
     beforeEach(function() {
@@ -27,6 +52,25 @@ describe("Map", function() {
         railm.check_city_locations(map);
     });
 
+    describe("is_city", function() {
+        it("returns true for hexes containing cities", function() {
+            expect(railm.is_city(map, railf.Hex(2, 2))).toEqual(true);
+            expect(railm.is_city(map, railf.Hex(4, 3))).toEqual(true);
+        });
+
+        it("returns false for all hexes on the map", function() {
+            expect(railm.is_city(map, railf.Hex(0, 0))).toEqual(false);
+            expect(railm.is_city(map, railf.Hex(2, 3))).toEqual(false);
+            expect(railm.is_city(map, railf.Hex(3, 2))).toEqual(false);
+            expect(railm.is_city(map, railf.Hex(1, 1))).toEqual(false);
+        });
+
+        it("fails for hexes off the map", function() {
+            expect(function() { railm.is_city(map, railf.Hex(10, 10)); }).toThrow();
+            expect(function() { railm.is_city(map, railf.Hex(-1, -1)); }).toThrow();
+        });
+    });
+
     describe("seed_cubes", function() {
         it("adds cubes to each city equal to that city's size", function() {
             railm.seed_cubes(map);
@@ -36,6 +80,138 @@ describe("Map", function() {
                 var num_cubes = railc.num_cubes_remaining(cities[i]);
                 expect(num_cubes).toEqual(railc.get_size(cities[i]));
             }
+        });
+    });
+});
+
+describe("Game", function() {
+    beforeEach(function() {
+        var settings = railf.Settings();
+        settings.players = [7, 2, 3];
+        settings.map = railf.Map();
+        game = railg.new_game(settings);
+    });
+    
+    describe("pay", function() {
+        var player;
+
+        beforeEach(function() {
+            player = railg.get_first_player(game);
+            railp.adjust_money(player, 10);
+        });
+
+        it("relieves the player of his money", function() {
+            railg.pay(game, player.id, 3);
+            expect(railp.get_money(player)).toEqual(7);
+        });
+
+        it("sells shares if the player doesn't have enough money", function() {
+            railg.pay(game, player.id, 17);
+            expect(railp.get_money(player)).toEqual(3);
+            expect(railp.get_shares(player)).toEqual(2);
+        });
+    });
+
+    describe("Track", function() {
+        describe("is_valid_path", function() {
+            beforeEach(function() {
+                var city0 = railf.City();
+                city0.size = 3;
+                city0.color = root.Color.colors.Yellow;
+
+                var city1 = railf.City();
+                city1.size = 4;
+                city1.color = root.Color.colors.Red;
+
+                var city2 = railf.City();
+                city2.size = 1;
+                city2.color = root.Color.colors.Gray;
+
+                var map = railf.Map();
+                railm.Builder.initialize_terrain(map, 5, 5);
+                railm.Builder.insert_city(map, city0, 0, 2);
+                railm.Builder.insert_city(map, city2, 2, 2);
+                railm.Builder.insert_city(map, city1, 4, 2);
+
+                var settings = railf.Settings();
+                settings.players = [2, 4, 9];
+                settings.map = map;
+                game = railg.new_game(settings);
+            });            
+
+            it("fails if the path is empty", function() {
+                var path = [
+                    railf.Hex(0,2),
+                    railf.Hex(1,2),
+                ]
+
+                expect(function() { railm.is_valid_path(game.map, path); }).toThrowError(/too short/);
+            });
+
+            it("fails if hexes are off the map", function() {
+                var path = [
+                    railf.Hex(1,4),
+                    railf.Hex(2,5),  // Off the map edge.
+                    railf.Hex(3,4),
+                ];
+
+                expect(function() { railm.is_valid_path(game.map, path); }).toThrowError(/off the map/);
+            });
+
+            it("fails if the path crosses a city", function() {
+                var path = [
+                    railf.Hex(0,2),
+                    railf.Hex(1,2),
+                    railf.Hex(2,2), // City position
+                    railf.Hex(3,2),
+                ];
+
+                expect(function() { railm.is_valid_path(game.map, path); }).toThrowError(/through city/);
+            });
+
+            it("fails if the path is not contiguous", function() {
+                var path = [
+                    railf.Hex(4,2),
+                    railf.Hex(3,2),
+                    railf.Hex(1,2),
+                    railf.Hex(0,2),
+                ];
+
+                expect(function() { railm.is_valid_path(game.map, path); }).toThrowError(/contiguous/);
+            });
+
+            it("fails if the path has a too-sharp curve", function() {
+                var path = [
+                    railf.Hex(2,2),
+                    railf.Hex(2,3),
+                    railf.Hex(3,2),
+                    railf.Hex(4,2),
+                ];
+
+                expect(function() { railm.is_valid_path(game.map, path); }).toThrowError(/curve/);
+            });
+
+            it("fails if the path crosses itself", function() {
+                var path = [
+                    railf.Hex(0,2),
+                    railf.Hex(1,2),
+                    railf.Hex(2,3),
+                    railf.Hex(3,2),
+                    railf.Hex(3,1),
+                    railf.Hex(2,1),
+                    railf.Hex(1,1),
+                    railf.Hex(0,2),
+                ]
+
+                //TODO:
+                // - make a hex equality function
+                // - test if each hex in the path is unique
+
+                expect(function() { railm.is_valid_path(game.map, path); }).toThrowError(/loop/);
+            });
+
+            xit("fails if there are already two tracks through one hex", function() {
+            });
         });
     });
 });
@@ -96,6 +272,13 @@ describe("new_game", function() {
         });
     });
 
+    it("adds cubes to each city", function() {
+        spyOn(railm, "seed_cubes");
+        game = railg.new_game(settings);
+        expect(railm.seed_cubes.calls.count()).toEqual(1);
+        expect(railm.seed_cubes.calls.argsFor(0)).toEqual([game.map]);
+    });
+
     it("returns a game state", function() {
         var game = railg.new_game(settings);
         expect(game).toBeDefined();
@@ -129,6 +312,38 @@ describe("bidding", function() {
 
         it("the top bid is zero", function() {
             expect(railg.get_top_bid(game)).toEqual(0);
+        });
+    });
+
+    describe("add_track", function() {
+        it("combines incomplete tracks", function() {
+            game = create_test_game_one();
+            
+            var path_a = [
+                railf.Hex(0,2),
+                railf.Hex(1,2),
+                railf.Hex(2,3),
+            ];
+            var path_b = [
+                railf.Hex(1,2),
+                railf.Hex(2,3),
+                railf.Hex(3,2),
+            ];
+            var path_c = [
+                railf.Hex(2,3),
+                railf.Hex(3,2),
+                railf.Hex(4,2),
+            ];
+
+            var pid = railg.get_current_player(game).id;
+            railg.add_track(game, pid, path_a);
+            railg.add_track(game, pid, path_b);
+            railg.add_track(game, pid, path_c);
+
+            var tracks = railg.get_track_array(game);
+            expect(tracks.length).toEqual(1);
+            expect(tracks[0].owner).toEqual(pid);
+            expect(tracks[0].complete).toEqual(true);
         });
     });
     
@@ -286,26 +501,6 @@ describe("bidding", function() {
         });
     });
 
-    describe("pay", function() {
-        var player;
-
-        beforeEach(function() {
-            player = railg.get_first_player(game);
-            railp.adjust_money(player, 10);
-        });
-
-        it("relieves the player of his money", function() {
-            railg.pay(game, player.id, 3);
-            expect(railp.get_money(player)).toEqual(7);
-        });
-
-        it("sells shares if the player doesn't have enough money", function() {
-            railg.pay(game, player.id, 17);
-            expect(railp.get_money(player)).toEqual(3);
-            expect(railp.get_shares(player)).toEqual(2);
-        });
-    });
-
     describe("placing a bid", function() {
         var bid_with_current_player = function(amount) {
             var player = railg.get_current_player(game);
@@ -380,24 +575,92 @@ describe("bidding", function() {
             expect(function() { raila.pass_bidding(game, player.id); }).toThrow();
         });
     });
+});
+
+describe("player actions", function() {
+    var game;
+
+    beforeEach(function() {
+        game = create_test_game_one();
+
+        // Move to the action phase of the game.
+        var seats = railg.get_seats(game);
+        for (var i = 0; i < seats.length; i++) {
+            raila.pass_bidding(game, seats[i].id);
+        }
+
+        spyOn(railg, 'end_turn');
+    });
+
+    describe("pass_turn", function() {
+        it("works only for the current player", function() {
+            var next_player = railg.get_next_player(game);
+            expect(function() { raila.pass_turn(game, next_player.id); }).toThrow();
+
+            var current_player = railg.get_current_player(game);
+            expect(function() { raila.pass_turn(game, current_player.id); }).not.toThrow();
+        });
+
+        it("ends the current player's turn", function() {
+            raila.pass_turn(game, railg.get_current_player(game).id);
+            expect(railg.end_turn.calls.count()).toEqual(1);
+        });
+    });
 
     describe("build_track", function() {
+        var short_track;
+        var current_player;
         beforeEach(function() {
+            short_track = [
+                railf.Hex(0,2),
+                railf.Hex(1,2),
+                railf.Hex(2,2),
+            ];
 
+            current_player = railg.get_current_player(game);
         });
 
         it("works only for the current player", function() {
             var next_player = railg.get_next_player(game);
-            expect(function() { raila.build_track(game, next_player.id, []); }).toThrow();
-
-            var current_player = railg.get_current_player(game);
-            expect(function() { raila.build_track(game, current_player.id, []); }).not.toThrow();
+            expect(function() { raila.build_track(game, next_player.id, short_track); }).toThrowError(/not this player/);
+            expect(function() { raila.build_track(game, current_player.id, short_track); }).not.toThrow();
         });
 
-        it("requires a minimum path size of 3", function() {
-            
+        it("ends the current player's turn", function() {
+            raila.build_track(game, current_player.id, short_track);
+            expect(railg.end_turn.calls.count()).toEqual(1);
         });
+
+        it("fails if the user doesn't build any tracks", function() {
+            var very_short_path = [
+                railf.Hex(0,2),
+                railf.Hex(1,2),
+            ];
+            expect(function() { raila.build_track(game, current_player.id, very_short_path); }).toThrowError(/No tracks/);
+        });
+
+        it("fails if the user tries to build too many tracks", function() {
+            var long_track = [
+                railf.Hex(0,0),
+                railf.Hex(0,1),
+                railf.Hex(0,2),
+                railf.Hex(0,3),
+                railf.Hex(1,3),
+                railf.Hex(2,3),
+                railf.Hex(2,2),
+            ];
+            expect(function() { raila.build_track(game, current_player.id, long_track); }).toThrowError(/4 hexes/);
+        });
+
+        xit("fails if the player already has a track connecting these cities", function() {
+        });
+
+        it("adds the track to the game state", function() {
+            spyOn(railg, "add_track");
+            raila.build_track(game, current_player.id, short_track);
+            expect(railg.add_track.calls.count()).toEqual(1);
+            expect(railg.add_track).toHaveBeenCalledWith(game, current_player.id, short_track);
+        });
+        
     });
-
 });
-
