@@ -117,9 +117,11 @@ var Util    = {};
     /**
      The hexes in a map should always be designed to that the even rows are offset to the
      right from the odd rows. eg.
-       0,0  0,1  0,2
-         1,0  1,1  1,2
-       2,0  2,1  2,2
+       0,0  0,1  0,2  0,3  0,4
+         1,0  1,1  1,2  1,3  1,4
+       2,0  2,1  2,2  2,3  2,4
+         3,0  3,1  3,2  3,3  3,4
+       4,0  4,1  4,2  4,3  4,4
      */
     Factory.Map = function() {
         return {
@@ -889,74 +891,89 @@ var Util    = {};
     Game.add_track = function(game_state, owner_id, path) {
         Util.assert(Map.is_valid_path(game_state.map, path), "Invalid track path.");
         
-        var map = game_state.map;
 
-        // Most tracks connect city to city in one action. We do a short-cut test for that
-        // before trying to extend an existing, incomplete track, or adding this as an
-        // incomplete track.
+        var map = game_state.map;
+        var tracks = Game.get_track_array(game_state);
 
         var new_track = Factory.Track();
+
         new_track.owner    = owner_id;
         new_track.path     = path;
         new_track.complete = false;
+
+        // Step 1: Try to combine this path with an existing track.
+        //  This can have the side-effect of making a copy of the tracks array so we can
+        //  modify it without breaking the gamestate and then exiting this function due to
+        //  the action failing. This function always exits with the game_state either
+        //  unchanged, or correctly updated, regardless of exceptions thrown.
+        for (var i = 0; i < tracks.length; i++) {
+            var tmp_track = Game.combine_tracks_if_possible(game_state, new_track, tracks[i]);
+            if (tmp_track !== null) {
+                new_track = tmp_track;
+                tracks = tracks.slice();
+                Util.Array.remove(tracks, tracks[i]);
+                break;
+            }
+        }
+
+        // First, make sure the track doesn't cross any hex that has two track in it.
+        function do_paths_overlap(path1, path2) {
+            // The test will be:
+            // If a hex from path1 is the same as a hex from path2, test if the next hex
+            // of path1 is the same as the previous or next hex of path2. If yes, then the
+            // paths overlap. We don't test the last hex of path1 because even if it is the
+            // same, there is no next hex to compare with (and so there can't be an overlap).
+            for (var i = 0; i < path1.length - 1; i++) {
+                var hex1 = path1[i];
+                for (var j = 0; j < path2.length; j++) {
+                    var hex2 = path2[j];
+                    if (Map.Hex.is_equal(hex1, hex2)) {
+                        var next1 = path1[i + 1];
+                        if (j < path2.length - 1 && Map.Hex.is_equal(next1, path2[j + 1])) {
+                            return true;
+                        }
+                        if (j > 0 && Map.Hex.is_equal(next1, path2[j - 1])) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        };
 
         function endpoints_match(l, r) {
             return Map.Hex.is_equal(l[0], r[0]) && Map.Hex.is_equal(Util.Array.back(l), Util.Array.back(r));
         };
 
-        function ensure_track_isnt_duplicate(tracks, track) {
-            for (var i = 0; i < tracks.length; i++) {
-                var other = tracks[i];
-                if (other.owner == track.owner &&
-                    (endpoints_match(track.path, other.path) ||
-                     endpoints_match(track.path, other.path.slice().reverse()))) {
-                    Util.assert(false, "Player has an existing route matching this one.");
-                }
-            }
-        };
-
-        if (Map.is_city(map, path[0]) && Map.is_city(map, path[path.length-1])) {
-            new_track.id = Game.get_new_track_id(game_state);
-            ensure_track_isnt_duplicate(Game.get_track_array(game_state), new_track);
-            game_state.tracks.push(new_track);
-            return new_track;
-        }
-
-        var tracks = Game.get_track_array(game_state);
+        // Test if this player already has a route connecting the two endpoints of this
+        // new track. If yes, then this is an illegal new path.
         for (var i = 0; i < tracks.length; i++) {
-            var combo_track = Game.combine_tracks_if_possible(game_state, new_track, tracks[i]);
-            if (combo_track !== null) {
-
-                // Create a local copy of the tracks array so that errors won't corrupt
-                // the game state.
-                var tracks = Game.get_track_array(game_state).slice();
-                Util.Array.remove(tracks, tracks[i]);
-
-                combo_track.id = Game.get_new_track_id(game_state);
-                ensure_track_isnt_duplicate(tracks, combo_track);
-                tracks.push(combo_track);
-
-                // Swap the old array with the new one.
-                game_state.tracks = tracks;
-                return combo_track;
+            var other = tracks[i];
+            if (other.owner == new_track.owner &&
+                (endpoints_match(new_track.path, other.path) ||
+                 endpoints_match(new_track.path, other.path.slice().reverse()))) {
+                Util.assert(false, "Player has an existing route matching this one.");
             }
         }
 
-        // If we fall through the previous loop, this new track is guaranteed to have the
-        // following two properties:
-        // - At least one end is not a city.
-        // - It cannot combine with any other tracks.
-        //
-        // Given that, we must assume this track is meant to stand alone. In that case,
-        // the last check to do is that it has at least one end-point on a city.
-        if (Map.is_city(map, path[0]) || Map.is_city(map, path[path.length -1])) {
-            new_track.id = Game.get_new_track_id(game_state);
-            ensure_track_isnt_duplicate(Game.get_track_array(game_state), new_track);
-            game_state.tracks.push(new_track);
-            return new_track;
+        // Test if this track overlaps an existing track.
+        // Two tracks overlap (as opposed to cross) if they both move from some hex to an
+        // adjacent hex.
+        for (var i = 0; i < tracks.length; i++) {
+            Util.assert(!do_paths_overlap(tracks[i].path, new_track.path), "Tracks overlap.");
         }
 
-        Util.assert(false, "The new track didn't connect with any cities.");
+        new_track.id = Game.get_new_track_id(game_state);
+        var front = new_track.path[0];
+        var back  = new_track.path[new_track.path.length - 1];
+        Util.assert(Map.is_city(map, front) || Map.is_city(map, back), "The new track doesn't connect with any cities.");
+
+        if (Map.is_city(map, front) && Map.is_city(map, back)) {
+            new_track.complete = true;
+        }
+
+        tracks.push(new_track);
+        game_state.tracks = tracks; // It may have been copied if tracks were combined.
+        return new_track;
     };
 
     Game.ensure_player_turn = function(game_state, player_id) {

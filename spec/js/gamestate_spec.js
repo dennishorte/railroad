@@ -112,6 +112,35 @@ describe("Game", function() {
             expect(function() { railg.add_track(game, pid, path_b); }).toThrowError(/existing route/);
         });
 
+        xit("fails if a hex already contains two tracks", function() {
+            
+        });
+
+        it("fails if two tracks enter or exit the same side of a hex", function() {
+            game = create_test_game_one();
+            
+            var path_a = [
+                railf.Hex(0,2),
+                railf.Hex(0,3),
+                railf.Hex(1,3),
+                railf.Hex(2,3),
+                railf.Hex(2,2),
+            ];
+
+            var path_b = [
+                railf.Hex(4,2),
+                railf.Hex(4,3),
+                railf.Hex(3,3),
+                railf.Hex(2,3),
+                railf.Hex(2,2),
+            ];
+
+            var pid = railg.get_current_player(game).id;
+            railg.add_track(game, pid, path_a);
+
+            expect(function() { railg.add_track(game, pid, path_b); }).toThrowError(/overlap/);
+        });
+
         it("combines incomplete tracks", function() {
             game = create_test_game_one();
             
