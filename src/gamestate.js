@@ -50,6 +50,10 @@ var Util    = {};
 
     Util.Array = {};
 
+    Util.Array.back = function(array) {
+        return array[array.length - 1];
+    };
+
     Util.Array.remove = function(array, element) {
         var index = array.indexOf(element);
         if (index == -1) {
@@ -121,7 +125,8 @@ var Util    = {};
         return {
             rows: 0,
             cols: 0,
-            hexes: [],
+            hexes: [],   // 2-d array of Map.Terrain elements
+            ridges: [],  // List of ridge positions. Each entry is a pair of hexes [h1, h2].
             cities: [],  // Index equals id.
         };
     };
@@ -268,6 +273,10 @@ var Util    = {};
             4: { name: "plains" , cost: 2    },
             5: { name: "hills"  , cost: 4    },
         },
+
+        RIDGE_COST      : 4,
+        HALF_RIDGE_COST : 2,
+        CROSSING_COST   : 2,
     };
 
     Map.Direction = {
@@ -365,6 +374,19 @@ var Util    = {};
                 city.cubes[color] += 1;
             }
         }
+    };
+
+    Map.crosses_ridge = function(map, hex1, hex2) {
+        for (var i = 0; i < map.ridges.length; i++) {
+            var ridge = map.ridges[i];
+            if (Map.Hex.is_equal(hex1, ridge[0]) && Map.Hex.is_equal(hex2, ridge[1])) {
+                return true;
+            }
+            else if (Map.Hex.is_equal(hex2, ridge[0]) && Map.Hex.is_equal(hex1, ridge[1])) {
+                return true;
+            }
+        };
+        return false;
     };
 
     Map.is_city = function(map, hex) {
@@ -494,6 +516,21 @@ var Util    = {};
         city.id = map.cities.length;
         map.cities.push(city);
         map.hexes[row][col] = Map.Terrain.CITY;
+    };
+
+    Map.Builder.set_terrain_type = function(map, type, row, col) {
+        Util.assert(row < map.rows && col < map.cols, "Invalid map location.");
+        map.hexes[row][col] = type;
+    };
+
+    Map.Builder.add_ridge = function(map, row1, col1, row2, col2) {
+        Util.assert(row1 < map.rows && col1 < map.cols, "Invalid map location A.");
+        Util.assert(row2 < map.rows && col2 < map.cols, "Invalid map location B.");
+        var ridge = [
+            Factory.Hex(row1, col1),
+            Factory.Hex(row2, col2),
+        ];
+        map.ridges.push(ridge);
     };
 }());
 
@@ -809,6 +846,46 @@ var Util    = {};
         return tracks.length == 0 ? 1 : tracks[tracks.length - 1].id + 1;
     };
 
+    Game.cost_for_track = function(game_state, path) {
+        var map = game_state.map;
+        
+        var cost = 0;
+        for (var i = 1; i < path.length - 1; i++) {
+            // Terrain cost
+            var terrain  = Map.get_terrain(map, path[i]);
+            var hex_cost = Map.Terrain.properties[terrain].cost;
+            Util.assert(hex_cost > 0, "Invalid hex cost.");
+            cost += hex_cost;
+
+            // Existing track test.
+            // This doesn't say anything about whether it is legal to cross this many track.
+            // All is does is say crossing any number of existing tracks adds a cost.
+            var tracks = Game.get_tracks_by_hex(game_state, path[i]);
+            if (tracks.length > 0) {
+                cost += Map.Terrain.CROSSING_COST;
+            }
+        }
+
+        // Ridge test.
+        for (var i = 1; i < path.length; i++) {
+            if (Map.crosses_ridge(map, path[i - 1], path[i])) {
+                if (i == 1 || i == path.length - 1) {
+                    cost += Map.Terrain.HALF_RIDGE_COST;
+                }
+                else {
+                    cost += Map.Terrain.RIDGE_COST;
+                }
+            }
+        }
+
+        return cost;
+    };
+
+    /**
+     @return
+     The newly added track. If the track was combined with another one, the combined track
+     is returned.
+     */
     Game.add_track = function(game_state, owner_id, path) {
         Util.assert(Map.is_valid_path(game_state.map, path), "Invalid track path.");
         
@@ -823,28 +900,45 @@ var Util    = {};
         new_track.path     = path;
         new_track.complete = false;
 
+        function endpoints_match(l, r) {
+            return Map.Hex.is_equal(l[0], r[0]) && Map.Hex.is_equal(Util.Array.back(l), Util.Array.back(r));
+        };
+
+        function ensure_track_isnt_duplicate(tracks, track) {
+            for (var i = 0; i < tracks.length; i++) {
+                var other = tracks[i];
+                if (other.owner == track.owner &&
+                    (endpoints_match(track.path, other.path) ||
+                     endpoints_match(track.path, other.path.slice().reverse()))) {
+                    Util.assert(false, "Player has an existing route matching this one.");
+                }
+            }
+        };
+
         if (Map.is_city(map, path[0]) && Map.is_city(map, path[path.length-1])) {
             new_track.id = Game.get_new_track_id(game_state);
+            ensure_track_isnt_duplicate(Game.get_track_array(game_state), new_track);
             game_state.tracks.push(new_track);
-            return;
+            return new_track;
         }
 
         var tracks = Game.get_track_array(game_state);
         for (var i = 0; i < tracks.length; i++) {
             var combo_track = Game.combine_tracks_if_possible(game_state, new_track, tracks[i]);
             if (combo_track !== null) {
+
                 // Create a local copy of the tracks array so that errors won't corrupt
                 // the game state.
                 var tracks = Game.get_track_array(game_state).slice();
                 Util.Array.remove(tracks, tracks[i]);
 
                 combo_track.id = Game.get_new_track_id(game_state);
-
+                ensure_track_isnt_duplicate(tracks, combo_track);
                 tracks.push(combo_track);
 
                 // Swap the old array with the new one.
                 game_state.tracks = tracks;
-                return;
+                return combo_track;
             }
         }
 
@@ -857,8 +951,9 @@ var Util    = {};
         // the last check to do is that it has at least one end-point on a city.
         if (Map.is_city(map, path[0]) || Map.is_city(map, path[path.length -1])) {
             new_track.id = Game.get_new_track_id(game_state);
+            ensure_track_isnt_duplicate(Game.get_track_array(game_state), new_track);
             game_state.tracks.push(new_track);
-            return;
+            return new_track;
         }
 
         Util.assert(false, "The new track didn't connect with any cities.");
@@ -908,7 +1003,11 @@ var Util    = {};
         Util.assert(path.length >= 3, "No tracks specified.");
         Util.assert(path.length <= 6, "Only 4 hexes of track can be built at a time.");
 
-        Game.add_track(game_state, player_id, path);
+        // Most of the error checking for valid tracks is done in this function.
+        var new_track = Game.add_track(game_state, player_id, path);
+        var cost = Game.cost_for_track(game_state, path);
+        
+        Game.pay(game_state, player_id, cost);
         Game.end_turn(game_state, player_id);
     };
 

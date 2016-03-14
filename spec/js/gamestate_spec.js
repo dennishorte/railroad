@@ -92,6 +92,57 @@ describe("Game", function() {
         game = railg.new_game(settings);
     });
     
+    describe("add_track", function() {
+        it("fails if the player already has a track connecting these cities", function() {
+            game = create_test_game_one();
+            
+            var path_a = [
+                railf.Hex(0,2),
+                railf.Hex(1,2),
+                railf.Hex(2,2),
+            ];
+            var path_b = [
+                railf.Hex(0,2),
+                railf.Hex(1,1),
+                railf.Hex(2,2),
+            ];;
+
+            var pid = railg.get_current_player(game).id;
+            railg.add_track(game, pid, path_a);
+            expect(function() { railg.add_track(game, pid, path_b); }).toThrowError(/existing route/);
+        });
+
+        it("combines incomplete tracks", function() {
+            game = create_test_game_one();
+            
+            var path_a = [
+                railf.Hex(0,2),
+                railf.Hex(1,2),
+                railf.Hex(2,3),
+            ];
+            var path_b = [
+                railf.Hex(1,2),
+                railf.Hex(2,3),
+                railf.Hex(3,2),
+            ];
+            var path_c = [
+                railf.Hex(2,3),
+                railf.Hex(3,2),
+                railf.Hex(4,2),
+            ];
+
+            var pid = railg.get_current_player(game).id;
+            railg.add_track(game, pid, path_a);
+            railg.add_track(game, pid, path_b);
+            railg.add_track(game, pid, path_c);
+
+            var tracks = railg.get_track_array(game);
+            expect(tracks.length).toEqual(1);
+            expect(tracks[0].owner).toEqual(pid);
+            expect(tracks[0].complete).toEqual(true);
+        });
+    });
+    
     describe("pay", function() {
         var player;
 
@@ -112,106 +163,186 @@ describe("Game", function() {
         });
     });
 
-    describe("Track", function() {
-        describe("is_valid_path", function() {
-            beforeEach(function() {
-                var city0 = railf.City();
-                city0.size = 3;
-                city0.color = root.Color.colors.Yellow;
+    describe("cost_for_track", function() {
+        beforeEach(function() {
+            game = create_test_game_one();
 
-                var city1 = railf.City();
-                city1.size = 4;
-                city1.color = root.Color.colors.Red;
+            // Modify the terrain so that it contains all the different types.
+            // p p c p p
+            //  p r p h h
+            // p r c h h
+            //  r p r p p
+            // p p c r p
 
-                var city2 = railf.City();
-                city2.size = 1;
-                city2.color = root.Color.colors.Gray;
+            var map = game.map;
+            railm.Builder.set_terrain_type(map, railm.Terrain.RIVER, 1, 1);
+            railm.Builder.set_terrain_type(map, railm.Terrain.RIVER, 2, 1);
+            railm.Builder.set_terrain_type(map, railm.Terrain.RIVER, 3, 0);
+            railm.Builder.set_terrain_type(map, railm.Terrain.RIVER, 3, 2);
+            railm.Builder.set_terrain_type(map, railm.Terrain.RIVER, 4, 3);
 
-                var map = railf.Map();
-                railm.Builder.initialize_terrain(map, 5, 5);
-                railm.Builder.insert_city(map, city0, 0, 2);
-                railm.Builder.insert_city(map, city2, 2, 2);
-                railm.Builder.insert_city(map, city1, 4, 2);
+            railm.Builder.set_terrain_type(map, railm.Terrain.HILLS, 1, 3);
+            railm.Builder.set_terrain_type(map, railm.Terrain.HILLS, 1, 4);
+            railm.Builder.set_terrain_type(map, railm.Terrain.HILLS, 2, 3);
+            railm.Builder.set_terrain_type(map, railm.Terrain.HILLS, 2, 4);
 
-                var settings = railf.Settings();
-                settings.players = [2, 4, 9];
-                settings.map = map;
-                game = railg.new_game(settings);
-            });            
+            railm.Builder.add_ridge(map, 1, 3, 2, 3);
+        });
 
-            it("fails if the path is empty", function() {
-                var path = [
-                    railf.Hex(0,2),
-                    railf.Hex(1,2),
-                ]
+        it("works correctly for ordinary terrain", function() {
+            var path = [
+                railf.Hex(0,2),
+                railf.Hex(1,2),  // plains = 2
+                railf.Hex(2,3),  // hills  = 4
+                railf.Hex(3,2),  // river  = 3
+                railf.Hex(4,2),
+            ];
+            expect(railg.cost_for_track(game, path)).toEqual(2 + 4 + 3);
+        });
 
-                expect(function() { railm.is_valid_path(game.map, path); }).toThrowError(/too short/);
-            });
+        it("works correctly across ridges", function() {
+            var path = [
+                railf.Hex(0,2),
+                railf.Hex(0,3),  // plains = 2
+                railf.Hex(1,3),  // hills  = 4 \__ ridge = 4
+                railf.Hex(2,3),  // hills  = 4 /
+                railf.Hex(2,2),
+            ];
+            expect(railg.cost_for_track(game, path)).toEqual(2 + 4 + 4 + 4);
+        });
 
-            it("fails if hexes are off the map", function() {
-                var path = [
-                    railf.Hex(1,4),
-                    railf.Hex(2,5),  // Off the map edge.
-                    railf.Hex(3,4),
-                ];
+        it("works correctly across existing tracks", function() {
+            var path1 = [
+                railf.Hex(0,2),
+                railf.Hex(1,2),  // plains = 2
+                railf.Hex(2,3),  // hills  = 4
+                railf.Hex(3,2),  // river  = 3
+                railf.Hex(4,2),
+            ];
+            railg.add_track(game, railg.get_current_player(game).id, path1);
 
-                expect(function() { railm.is_valid_path(game.map, path); }).toThrowError(/off the map/);
-            });
+            var path2 = [
+                railf.Hex(0,2),
+                railf.Hex(0,3),  // plains = 2
+                railf.Hex(1,3),  // hills  = 4 \__ ridge = 4
+                railf.Hex(2,3),  // hills  = 4 /  -- crosses track = 2
+                railf.Hex(2,2),
+            ];
 
-            it("fails if the path crosses a city", function() {
-                var path = [
-                    railf.Hex(0,2),
-                    railf.Hex(1,2),
-                    railf.Hex(2,2), // City position
-                    railf.Hex(3,2),
-                ];
+            expect(railg.cost_for_track(game, path2)).toEqual(2 + 4 + 4 + 4 + 2);
+        });
 
-                expect(function() { railm.is_valid_path(game.map, path); }).toThrowError(/through city/);
-            });
+        it("charges half the cost for a ridge if you don't cross it yet", function() {
+            // When the player builds a track in stages, sometimes he may build a track
+            // up to a ridge, but not build across it. In this case, we charge half the
+            // ridge cost, and charge half again when he builds the rest of the track.
+            var path = [
+                railf.Hex(0,2),
+                railf.Hex(0,3),  // plains = 2
+                railf.Hex(1,3),  // hills  = 4 \__ half ridge = 2
+                railf.Hex(2,3),  //            /
+            ];
+            expect(railg.cost_for_track(game, path)).toEqual(2 + 4 + 2);
+        });
+    });
+});
 
-            it("fails if the path is not contiguous", function() {
-                var path = [
-                    railf.Hex(4,2),
-                    railf.Hex(3,2),
-                    railf.Hex(1,2),
-                    railf.Hex(0,2),
-                ];
+describe("Map", function() {
+    describe("is_valid_path", function() {
+        beforeEach(function() {
+            var city0 = railf.City();
+            city0.size = 3;
+            city0.color = root.Color.colors.Yellow;
 
-                expect(function() { railm.is_valid_path(game.map, path); }).toThrowError(/contiguous/);
-            });
+            var city1 = railf.City();
+            city1.size = 4;
+            city1.color = root.Color.colors.Red;
 
-            it("fails if the path has a too-sharp curve", function() {
-                var path = [
-                    railf.Hex(2,2),
-                    railf.Hex(2,3),
-                    railf.Hex(3,2),
-                    railf.Hex(4,2),
-                ];
+            var city2 = railf.City();
+            city2.size = 1;
+            city2.color = root.Color.colors.Gray;
 
-                expect(function() { railm.is_valid_path(game.map, path); }).toThrowError(/curve/);
-            });
+            var map = railf.Map();
+            railm.Builder.initialize_terrain(map, 5, 5);
+            railm.Builder.insert_city(map, city0, 0, 2);
+            railm.Builder.insert_city(map, city2, 2, 2);
+            railm.Builder.insert_city(map, city1, 4, 2);
 
-            it("fails if the path crosses itself", function() {
-                var path = [
-                    railf.Hex(0,2),
-                    railf.Hex(1,2),
-                    railf.Hex(2,3),
-                    railf.Hex(3,2),
-                    railf.Hex(3,1),
-                    railf.Hex(2,1),
-                    railf.Hex(1,1),
-                    railf.Hex(0,2),
-                ]
+            var settings = railf.Settings();
+            settings.players = [2, 4, 9];
+            settings.map = map;
+            game = railg.new_game(settings);
+        });            
 
-                //TODO:
-                // - make a hex equality function
-                // - test if each hex in the path is unique
+        it("fails if the path is empty", function() {
+            var path = [
+                railf.Hex(0,2),
+                railf.Hex(1,2),
+            ]
 
-                expect(function() { railm.is_valid_path(game.map, path); }).toThrowError(/loop/);
-            });
+            expect(function() { railm.is_valid_path(game.map, path); }).toThrowError(/too short/);
+        });
 
-            xit("fails if there are already two tracks through one hex", function() {
-            });
+        it("fails if hexes are off the map", function() {
+            var path = [
+                railf.Hex(1,4),
+                railf.Hex(2,5),  // Off the map edge.
+                railf.Hex(3,4),
+            ];
+
+            expect(function() { railm.is_valid_path(game.map, path); }).toThrowError(/off the map/);
+        });
+
+        it("fails if the path crosses a city", function() {
+            var path = [
+                railf.Hex(0,2),
+                railf.Hex(1,2),
+                railf.Hex(2,2), // City position
+                railf.Hex(3,2),
+            ];
+
+            expect(function() { railm.is_valid_path(game.map, path); }).toThrowError(/through city/);
+        });
+
+        it("fails if the path is not contiguous", function() {
+            var path = [
+                railf.Hex(4,2),
+                railf.Hex(3,2),
+                railf.Hex(1,2),
+                railf.Hex(0,2),
+            ];
+
+            expect(function() { railm.is_valid_path(game.map, path); }).toThrowError(/contiguous/);
+        });
+
+        it("fails if the path has a too-sharp curve", function() {
+            var path = [
+                railf.Hex(2,2),
+                railf.Hex(2,3),
+                railf.Hex(3,2),
+                railf.Hex(4,2),
+            ];
+
+            expect(function() { railm.is_valid_path(game.map, path); }).toThrowError(/curve/);
+        });
+
+        it("fails if the path crosses itself", function() {
+            var path = [
+                railf.Hex(0,2),
+                railf.Hex(1,2),
+                railf.Hex(2,3),
+                railf.Hex(3,2),
+                railf.Hex(3,1),
+                railf.Hex(2,1),
+                railf.Hex(1,1),
+                railf.Hex(0,2),
+            ]
+
+            //TODO:
+            // - make a hex equality function
+            // - test if each hex in the path is unique
+
+            expect(function() { railm.is_valid_path(game.map, path); }).toThrowError(/loop/);
         });
     });
 });
@@ -315,38 +446,6 @@ describe("bidding", function() {
         });
     });
 
-    describe("add_track", function() {
-        it("combines incomplete tracks", function() {
-            game = create_test_game_one();
-            
-            var path_a = [
-                railf.Hex(0,2),
-                railf.Hex(1,2),
-                railf.Hex(2,3),
-            ];
-            var path_b = [
-                railf.Hex(1,2),
-                railf.Hex(2,3),
-                railf.Hex(3,2),
-            ];
-            var path_c = [
-                railf.Hex(2,3),
-                railf.Hex(3,2),
-                railf.Hex(4,2),
-            ];
-
-            var pid = railg.get_current_player(game).id;
-            railg.add_track(game, pid, path_a);
-            railg.add_track(game, pid, path_b);
-            railg.add_track(game, pid, path_c);
-
-            var tracks = railg.get_track_array(game);
-            expect(tracks.length).toEqual(1);
-            expect(tracks[0].owner).toEqual(pid);
-            expect(tracks[0].complete).toEqual(true);
-        });
-    });
-    
     // The next_bidder function should be called after each time a player places a valid
     // bid. This tests that in all of the situations where it can be called, the right
     // stuff happens. Other calls that should result in the next player being set need
@@ -652,15 +751,19 @@ describe("player actions", function() {
             expect(function() { raila.build_track(game, current_player.id, long_track); }).toThrowError(/4 hexes/);
         });
 
-        xit("fails if the player already has a track connecting these cities", function() {
-        });
-
         it("adds the track to the game state", function() {
             spyOn(railg, "add_track");
             raila.build_track(game, current_player.id, short_track);
             expect(railg.add_track.calls.count()).toEqual(1);
             expect(railg.add_track).toHaveBeenCalledWith(game, current_player.id, short_track);
         });
-        
+
+        it("makes the player pay", function() {
+            spyOn(railg, "pay");
+            spyOn(railg, "cost_for_track")
+            raila.build_track(game, current_player.id, short_track);
+            expect(railg.cost_for_track.calls.count()).toEqual(1);
+            expect(railg.pay.calls.count()).toEqual(1);
+        });
     });
 });
