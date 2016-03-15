@@ -944,6 +944,18 @@ var Util    = {};
             return Map.Hex.is_equal(l[0], r[0]) && Map.Hex.is_equal(Util.Array.back(l), Util.Array.back(r));
         };
 
+        // Test if this track overlaps an existing track.
+        // Two tracks overlap (as opposed to cross) if they both move from some hex to an
+        // adjacent hex.
+        for (var i = 0; i < tracks.length; i++) {
+            Util.assert(!do_paths_overlap(tracks[i].path, new_track.path), "Tracks overlap.");
+        }
+
+        for (var i = 1; i < new_track.path.length; i++) {
+            var tracks_on_hex = Game.get_tracks_by_hex(game_state, new_track.path[i]);
+            Util.assert(tracks_on_hex.length < 2, "There are too many tracks on hex.");
+        }
+
         // Test if this player already has a route connecting the two endpoints of this
         // new track. If yes, then this is an illegal new path.
         for (var i = 0; i < tracks.length; i++) {
@@ -953,13 +965,6 @@ var Util    = {};
                  endpoints_match(new_track.path, other.path.slice().reverse()))) {
                 Util.assert(false, "Player has an existing route matching this one.");
             }
-        }
-
-        // Test if this track overlaps an existing track.
-        // Two tracks overlap (as opposed to cross) if they both move from some hex to an
-        // adjacent hex.
-        for (var i = 0; i < tracks.length; i++) {
-            Util.assert(!do_paths_overlap(tracks[i].path, new_track.path), "Tracks overlap.");
         }
 
         new_track.id = Game.get_new_track_id(game_state);
