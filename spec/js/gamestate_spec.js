@@ -9,26 +9,37 @@ var railp = root.Player;
 function create_test_game_one() {
     var city0 = railf.City();
     city0.size = 3;
-    city0.color = root.Color.colors.Yellow;
+    city0.color = root.Color.colors.YELLOW;
 
     var city1 = railf.City();
-    city1.size = 4;
-    city1.color = root.Color.colors.Red;
+    city1.size = 1;
+    city1.color = root.Color.colors.RED;
 
     var city2 = railf.City();
-    city2.size = 1;
-    city2.color = root.Color.colors.Gray;
+    city2.size = 4;
+    city2.color = root.Color.colors.GRAY;
 
     var map = railf.Map();
     railm.Builder.initialize_terrain(map, 5, 5);
     railm.Builder.insert_city(map, city0, 0, 2);
-    railm.Builder.insert_city(map, city2, 2, 2);
-    railm.Builder.insert_city(map, city1, 4, 2);
+    railm.Builder.insert_city(map, city1, 2, 2);
+    railm.Builder.insert_city(map, city2, 4, 2);
 
     var settings = railf.Settings();
     settings.players = [2, 4, 9];
     settings.map = map;
     return railg.new_game(settings);
+};
+
+function set_current_player(game_state, player) {
+    var seats = railg.get_seats(game_state);
+    for (var i = 0; i < seats.length; i++) {
+        if (seats[i].id == player.id) {
+            game_state.current_seat = i;
+            return;
+        }
+    }
+    throw new Error("Couldn't find player.");
 };
 
 describe("Map", function() {
@@ -786,7 +797,7 @@ describe("player actions", function() {
 
         it("ends the current player's turn", function() {
             raila.build_track(game, current_player.id, short_track);
-            expect(railg.end_turn.calls.count()).toEqual(1);
+            expect(railg.end_turn).toHaveBeenCalledTimes(1);
         });
 
         it("fails if the user doesn't build any tracks", function() {
@@ -823,6 +834,155 @@ describe("player actions", function() {
             raila.build_track(game, current_player.id, short_track);
             expect(railg.cost_for_track.calls.count()).toEqual(1);
             expect(railg.pay.calls.count()).toEqual(1);
+        });
+    });
+
+    describe("deliver_goods", function() {
+
+        function adjust_cubes(game_state, city_hex, cubes) {
+            railm.get_city_by_hex(game_state.map, city_hex).cubes = cubes;
+        };
+
+        var current_player;
+        var next_player;
+        var track_a_id;
+        var track_b_id;
+        var track_c_id;
+
+        beforeEach(function() {
+            game = create_test_game_one();
+            current_player = railg.get_current_player(game);
+            next_player = railg.get_next_player(game);
+
+            railp.increment_engine(current_player);
+            railp.increment_engine(next_player);
+
+            var path_a = [
+                railf.Hex(0,2),
+                railf.Hex(1,2),
+                railf.Hex(2,2),
+            ];
+
+            var path_b = [
+                railf.Hex(4,2),
+                railf.Hex(3,1),
+                railf.Hex(2,1),
+                railf.Hex(1,0),
+                railf.Hex(0,1),
+                railf.Hex(0,2),
+            ];
+
+            var path_c = [
+                railf.Hex(0,2),
+                railf.Hex(1,1),
+                railf.Hex(2,2),
+            ];
+
+            track_a_id = railg.add_track(game, current_player.id, path_a).id;
+            track_b_id = railg.add_track(game, current_player.id, path_b).id;
+            track_c_id = railg.add_track(game, next_player.id, path_c).id;
+
+            adjust_cubes(game, railf.Hex(0,2), railf.Cubes());
+            adjust_cubes(game, railf.Hex(2,2), railf.Cubes());
+
+            var cubes42 = railf.Cubes();
+            cubes42[root.Color.colors.RED   ] = 1;
+            cubes42[root.Color.colors.YELLOW] = 1;
+            adjust_cubes(game, railf.Hex(4,2), cubes42);
+        });
+
+        it("works only for the current player", function() {
+            var city = railm.get_city_by_hex(game.map, railf.Hex(4,2));
+
+            expect(function() {
+                raila.deliver_goods(game, next_player.id, city.id, [track_b_id, track_a_id]);
+            }).toThrowError(/not this player/);
+
+            expect(function() {
+                raila.deliver_goods(game, current_player.id, city.id, [track_b_id, track_a_id]);
+            }).not.toThrow();
+        });
+
+        it("ends the current player's turn", function() {
+            var city = railm.get_city_by_hex(game.map, railf.Hex(4,2));
+            raila.deliver_goods(game, current_player.id, city.id, [track_b_id, track_c_id]);
+            expect(railg.end_turn).toHaveBeenCalledTimes(1);
+        });
+
+        it("fails if the user doesn't control the first segment", function() {
+            var city = railm.get_city_by_hex(game.map, railf.Hex(4,2));
+            set_current_player(game, next_player);
+            expect(function() {
+                raila.deliver_goods(game, next_player.id, city.id, [track_b_id, track_a_id]);
+            }).toThrowError(/first segment/);
+        });
+
+        it("fails if the source city has no goods of the dest city color", function() {
+            var city = railm.get_city_by_hex(game.map, railf.Hex(4,2));
+            city.cubes[root.Color.colors.RED] = 0;
+            expect(function() {
+                raila.deliver_goods(game, current_player.id, city.id, [track_b_id, track_a_id]);
+            }).toThrowError(/no cubes/i);
+        });
+
+        it("fails if the player's engine isn't strong enough", function() {
+            var city = railm.get_city_by_hex(game.map, railf.Hex(4,2));
+            current_player.engine = 1;
+            expect(function() {
+                raila.deliver_goods(game, current_player.id, city.id, [track_b_id, track_a_id]);
+            }).toThrowError(/stronger engine/i);
+        });
+
+        it("fails if the path contains a loop", function() {
+            var city = railm.get_city_by_hex(game.map, railf.Hex(0,2));
+            city.cubes[root.Color.colors.YELLOW] = 1;
+            
+            railp.increment_engine(current_player);
+            railp.increment_engine(current_player);
+            railp.increment_engine(current_player);
+            railp.increment_engine(current_player);
+            
+            expect(function() {
+                raila.deliver_goods(game, current_player.id, city.id, [
+                    track_a_id,
+                    track_c_id,
+                ]);
+            }).toThrowError(/contains loop/i);
+        });
+
+        it("fails if the path contains a city the same color as the dest city", function() {
+            var city0 = railm.get_city_by_hex(game.map, railf.Hex(0,2));
+            city0.color = root.Color.colors.RED;
+            // console.log(game.map.cities);
+
+            var city1 = railm.get_city_by_hex(game.map, railf.Hex(4,2));
+
+            expect(function() {
+                raila.deliver_goods(game, current_player.id, city1.id, [track_b_id, track_a_id]);
+            }).toThrowError(/color/i);
+        });
+
+        it("fails if the segments aren't contiguous", function() {
+            var city = railm.get_city_by_hex(game.map, railf.Hex(4,2));
+            expect(function() {
+                raila.deliver_goods(game, current_player.id, city.id, [track_a_id, track_b_id]);
+            }).toThrowError(/contiguous/i);
+        });
+
+        it("distributes points for each track it crosses", function() {
+            var city = railm.get_city_by_hex(game.map, railf.Hex(4,2));
+            raila.deliver_goods(game, current_player.id, city.id, [track_b_id, track_c_id]);
+            expect(railp.get_score(current_player)).toEqual(1);
+            expect(railp.get_score(next_player)).toEqual(1);
+        });
+
+        it("removes the correct cube from the source city", function() {
+            var city = railm.get_city_by_hex(game.map, railf.Hex(4,2));
+            expect(railc.num_cubes_remaining(city)).toEqual(2);
+            raila.deliver_goods(game, current_player.id, city.id, [track_b_id, track_a_id]);
+            expect(railc.num_cubes_remaining(city)).toEqual(1);
+            expect(city.cubes[root.Color.colors.RED]).toEqual(0);
+            expect(city.cubes[root.Color.colors.YELLOW]).toEqual(1);
         });
     });
 });

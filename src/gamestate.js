@@ -360,6 +360,16 @@ var Util    = {};
         return map.cities[city_id];
     };
 
+    Map.get_city_by_hex = function(map, hex) {
+        for (var i = 0; i < map.cities.length; i++) {
+            var city = map.cities[i];
+            if (city.row == hex.row && city.col == hex.col) {
+                return city;
+            }
+        }
+        Util.assert(false, "No city found at hex.");
+    };
+
     Map.get_terrain = function(map, hex) {
         return map.hexes[hex.row][hex.col];
     };
@@ -571,6 +581,22 @@ var Util    = {};
 
     Player.add_share = function(player) {
         player.shares += 1;
+    };
+
+    Player.get_score = function(player) {
+        return player.points;
+    };
+
+    Player.add_points = function(player, points) {
+        player.points += points;
+    };
+
+    Player.get_engine = function(player) {
+        return player.engine;
+    };
+
+    Player.increment_engine = function(player) {
+        player.engine += 1;
     };
 
 }());
@@ -1031,6 +1057,70 @@ var Util    = {};
         
         Game.pay(game_state, player_id, cost);
         Game.end_turn(game_state, player_id);
+    };
+
+    // Public API
+    Action.deliver_goods = function(game_state, player_id, source_id, segment_ids) {
+        Game.ensure_player_turn(game_state, player_id);
+        var player = Game.get_player_by_id(game_state, player_id);
+
+        Util.assert(
+            Game.get_track_by_id(game_state, segment_ids[0]).owner == player_id,
+            "Player doesn't own first segment.");
+        Util.assert(
+            Player.get_engine(player) >= segment_ids.length,
+            "Player needs a stronger engine.");
+
+        var source_city = Map.get_city_by_id(game_state.map, source_id);
+        var dest_city = source_city;
+        var dest_hex = City.get_hex(dest_city);
+
+        // This will keep track of how many segments of each player were used in the path.
+        var points = {};
+        Game.get_seats(game_state).forEach(function(player) {
+            points[player.id] = 0;
+        });
+
+        // This will make sure there are no loops in the path.
+        var cities = {};
+        cities[source_id] = true;
+
+        // This will make sure there are no colors matching the dest city on the path.
+        var colors = {};
+
+        // Find the destination city.
+        for (var i = 0; i < segment_ids.length; i++) {
+            var track = Game.get_track_by_id(game_state, segment_ids[i]);
+            if (Map.Hex.is_equal(dest_hex, track.path[0])) {
+                dest_hex = Util.Array.back(track.path);
+            }
+            else if (Map.Hex.is_equal(dest_hex, Util.Array.back(track.path))) {
+                dest_hex = track.path[0];
+            }
+            else {
+                Util.assert(false, "Segment doesn't create contiguous path.");
+            }
+            dest_city = Map.get_city_by_hex(game_state.map, dest_hex);
+            Util.assert(!cities.hasOwnProperty(dest_city.id), "Path contains loop.");
+            cities[dest_city.id] = true;
+            if (i < segment_ids.length - 1) {  // Don't add the dest city.
+                colors[dest_city.color] = true;
+            }
+            points[track.owner] += 1;
+        }
+
+        Util.assert(!colors.hasOwnProperty(dest_city.color), "Path contains destination color.");
+
+        // Ensure the source city has a cube of the correct color, and remove it.
+        Util.assert(source_city.cubes[dest_city.color] > 0, "No cubes of the correct color.");
+        source_city.cubes[dest_city.color] -= 1;
+
+        // Give the player points.
+        Game.get_seats(game_state).forEach(function(player) {
+            Player.add_points(player, points[player.id]);
+        });
+
+        Game.end_turn(game_state);
     };
 
 }());
