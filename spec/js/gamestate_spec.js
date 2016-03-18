@@ -985,4 +985,50 @@ describe("player actions", function() {
             expect(city.cubes[root.Color.colors.YELLOW]).toEqual(1);
         });
     });
+
+    describe("upgrade_engine", function() {
+        var current_player;
+
+        beforeEach(function() {
+            current_player = railg.get_current_player(game);
+        });
+
+        it("works only for the current player", function() {
+            var next_player = railg.get_next_player(game);
+            
+            expect(function() {
+                raila.upgrade_engine(game, next_player.id);
+            }).toThrowError(/not this player/);
+
+            expect(function() {
+                raila.upgrade_engine(game, current_player.id);
+            }).not.toThrow();
+        });
+
+        it("ends the current player's turn", function() {
+            raila.upgrade_engine(game, current_player.id);
+            expect(railg.end_turn).toHaveBeenCalledTimes(1);
+        });
+        
+        it("makes the player pay", function() {
+            spyOn(railg, "pay");
+            spyOn(railg, "cost_for_engine")
+            raila.upgrade_engine(game, current_player.id);
+            expect(railg.cost_for_engine).toHaveBeenCalledTimes(1);
+            expect(railg.pay).toHaveBeenCalledTimes(1);
+        });
+
+        it("fails if the player is at max engine size", function() {
+            current_player.engine = 8;
+            expect(function() {
+                raila.upgrade_engine(game, current_player.id);
+            }).toThrowError(/max engine/i);
+        });
+
+        it("increases the player's engine rating by one", function() {
+            expect(railp.get_engine(current_player)).toEqual(1);
+            raila.upgrade_engine(game, current_player.id);
+            expect(railp.get_engine(current_player)).toEqual(2);
+        });
+    });
 });

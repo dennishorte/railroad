@@ -874,6 +874,22 @@ var Util    = {};
         return tracks.length == 0 ? 1 : tracks[tracks.length - 1].id + 1;
     };
 
+    Game.cost_for_engine = function(game_state, player_id) {
+        var player = Game.get_player_by_id(game_state, player_id);
+        var engine = Player.get_engine(player);
+        Util.assert(engine < 8, "Player already has max engine level.");
+        var costs = {  // Cost to upgrade FROM the specified level.
+            1 : 5000,
+            2 : 10000,
+            3 : 10000,
+            4 : 15000,
+            5 : 15000,
+            6 : 20000,
+            7 : 20000,
+        };
+        return costs[engine];
+    };
+
     Game.cost_for_track = function(game_state, path) {
         var map = game_state.map;
         
@@ -1120,6 +1136,13 @@ var Util    = {};
             Player.add_points(player, points[player.id]);
         });
 
+        Game.end_turn(game_state);
+    };
+
+    Action.upgrade_engine = function(game_state, player_id) {
+        Game.ensure_player_turn(game_state, player_id);
+        Player.increment_engine(Game.get_player_by_id(game_state, player_id));
+        Game.pay(game_state, player_id, Game.cost_for_engine(game_state, player_id));
         Game.end_turn(game_state);
     };
 
