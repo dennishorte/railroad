@@ -984,6 +984,9 @@ describe("player actions", function() {
             expect(city.cubes[root.Color.colors.RED]).toEqual(0);
             expect(city.cubes[root.Color.colors.YELLOW]).toEqual(1);
         });
+
+        xit("allows delivery of western link cubes to red cities", function() {
+        });
     });
 
     describe("upgrade_engine", function() {
@@ -1088,6 +1091,64 @@ describe("player actions", function() {
             expect(railc.num_cubes_remaining(city)).toEqual(1);
             raila.urbanize(game, current_player.id, city.id, root.Color.colors.BLUE);
             expect(railc.num_cubes_remaining(city)).toEqual(3);
+        });
+    });
+
+    describe("western_link", function() {
+        var current_player;
+        var city;
+
+        beforeEach(function() {
+            current_player = railg.get_current_player(game);
+            city = railm.get_city_by_hex(game.map, railf.Hex(4,2));
+            city.western_link = railc.WesternLinkState.POSSIBLE;
+        });
+
+        it("works only for the current player", function() {
+            var next_player = railg.get_next_player(game);
+            
+            expect(function() {
+                raila.western_link(game, next_player.id, city.id);
+            }).toThrowError(/not this player/);
+
+            expect(function() {
+                raila.western_link(game, current_player.id, city.id);
+            }).not.toThrow();
+        });
+
+        it("ends the current player's turn", function() {
+            raila.western_link(game, current_player.id, city.id);
+            expect(railg.end_turn).toHaveBeenCalledTimes(1);
+        });
+        
+        it("makes the player pay", function() {
+            spyOn(railg, "pay");
+            raila.western_link(game, current_player.id, city.id);
+            expect(railg.pay).toHaveBeenCalledTimes(1);
+        });
+
+        it("fails if the selected city has no western link option", function() {
+            city.western_link = railc.WesternLinkState.NONE;
+            expect(function() {
+                raila.western_link(game, current_player.id, city.id);
+            }).toThrowError(/cannot have/i);
+        });
+
+        it("fails if the selected city already has a western link", function() {
+            city.western_link = railc.WesternLinkState.BUILT;
+            expect(function() {
+                raila.western_link(game, current_player.id, city.id);
+            }).toThrowError(/already built/i);
+        });
+
+        it("adds four western link cubes to the city", function() {
+            raila.western_link(game, current_player.id, city.id);
+            expect(city.cubes[root.Color.colors.WEST]).toEqual(4);
+        });
+
+        it("updates the western link state of the city", function() {
+            raila.western_link(game, current_player.id, city.id);
+            expect(city.western_link).toEqual(railc.WesternLinkState.BUILT);
         });
     });
 });

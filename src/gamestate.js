@@ -1177,4 +1177,18 @@ var Util    = {};
         Game.end_turn(game_state);
     };
 
+    Action.western_link = function(game_state, player_id, city_id) {
+        Game.ensure_player_turn(game_state, player_id);
+
+        var city = Map.get_city_by_id(game_state.map, city_id);
+        Util.assert(city.western_link != City.WesternLinkState.BUILT, "Western link is already built.");
+        Util.assert(city.western_link != City.WesternLinkState.NONE, "City cannot have a western link.");
+
+        city.western_link = City.WesternLinkState.BUILT;
+        city.cubes[Color.colors.WEST] = 4;
+
+        Game.pay(game_state, player_id, 30);
+        Game.end_turn(game_state);
+    };
+
 }());
