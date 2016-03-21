@@ -985,7 +985,23 @@ describe("player actions", function() {
             expect(city.cubes[root.Color.colors.YELLOW]).toEqual(1);
         });
 
-        xit("allows delivery of western link cubes to red cities", function() {
+        describe("western link cubes", function() {
+            var city;
+            var chicago;
+            beforeEach(function() {
+                city = railm.get_city_by_hex(game.map, railf.Hex(4,2));
+                city.cubes[root.Color.colors.RED ] = 1;
+                city.western_link = railc.WesternLinkState.BUILT;
+
+                chicago = railm.get_city_by_hex(game.map, railf.Hex(2,2));
+                chicago.western_link = railc.WesternLinkState.DEST;
+            });
+
+            it("creates new cubes if delivered to Chicago", function() {
+                var initial_cubes = railc.num_cubes_remaining(chicago);
+                raila.deliver_goods(game, current_player.id, city.id, [track_b_id, track_a_id]);
+                expect(railc.num_cubes_remaining(chicago)).toEqual(initial_cubes + 2);
+            });
         });
     });
 
@@ -1141,9 +1157,10 @@ describe("player actions", function() {
             }).toThrowError(/already built/i);
         });
 
-        it("adds four western link cubes to the city", function() {
+        it("adds four red cubes to the city", function() {
+            city.cubes[root.Color.colors.RED] = 0;
             raila.western_link(game, current_player.id, city.id);
-            expect(city.cubes[root.Color.colors.WEST]).toEqual(4);
+            expect(city.cubes[root.Color.colors.RED]).toEqual(4);
         });
 
         it("updates the western link state of the city", function() {

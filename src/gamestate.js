@@ -187,7 +187,6 @@ var Util    = {};
         PURPLE : 4,
         BLACK  : 5,
         GRAY   : 6,
-        WEST   : 7,  // For western link cubes
         properties : {
             0: { name: "invalid" },
             1: { name: "red"     },
@@ -196,20 +195,8 @@ var Util    = {};
             4: { name: "purple"  },
             5: { name: "black"   },
             6: { name: "gray"    },
-            7: { name: "west"    },
         },
     };
-
-    // The colors that can be seeded onto cities as random cubes.
-    // This doesn't include the WEST color, although that is a cube type, because it cannot
-    // be placed as a random cube.
-    Color.random_cubes = [
-        Color.colors.RED,
-        Color.colors.YELLOW,
-        Color.colors.BLUE,
-        Color.colors.PURPLE,
-        Color.colors.BLACK,
-    ];
 
     // The colors that can be selected for the urbanize action.
     Color.urbanize_colors = [
@@ -226,7 +213,6 @@ var Util    = {};
         Color.colors.BLUE,
         Color.colors.PURPLE,
         Color.colors.BLACK,
-        Color.colors.WEST,
     ];
 
 }());
@@ -236,6 +222,7 @@ var Util    = {};
         NONE    : 0,
         POSSIBLE: 1,
         BUILT   : 2,
+        DEST    : 3,  // A city where red cube deliveries cause extra stuff to appear.
     };
     
     /**
@@ -394,7 +381,7 @@ var Util    = {};
         for (var i = 0; i < Map.num_cities(map); i++) {
             var city = map.cities[i];
             for (var j = 0; j < City.get_size(city); j++) {
-                var color = Util.Array.select(Color.random_cubes);
+                var color = Util.Array.select(Color.cubes);
                 city.cubes[color] += 1;
             }
         }
@@ -1087,8 +1074,16 @@ var Util    = {};
         Game.end_turn(game_state, player_id);
     };
 
-    // Public API
-    Action.deliver_goods = function(game_state, player_id, source_id, segment_ids) {
+    /**
+     Public API
+
+     @param color
+     The color can optionally be undefined. If it is undefined or Color.colors.INVALID, it
+     will automatically resolve to the color of the destination city. There is currently a
+     single case where specifying the color is required. On a city with the western link
+     built, it is possible to have both regular red cubes as well as western link red cubes
+     */
+    Action.deliver_goods = function(game_state, player_id, source_id, segment_ids, color) {
         Game.ensure_player_turn(game_state, player_id);
         var player = Game.get_player_by_id(game_state, player_id);
 
@@ -1143,6 +1138,14 @@ var Util    = {};
         Util.assert(source_city.cubes[dest_city.color] > 0, "No cubes of the correct color.");
         source_city.cubes[dest_city.color] -= 1;
 
+        if (dest_city.western_link == City.WesternLinkState.DEST
+            && source_city.western_link == City.WesternLinkState.BUILT) {
+            for (var j = 0; j < 2; j++) {
+                var color = Util.Array.select(Color.cubes);
+                dest_city.cubes[color] += 1;
+            }
+        }
+
         // Give the player points.
         Game.get_seats(game_state).forEach(function(player) {
             Player.add_points(player, points[player.id]);
@@ -1169,7 +1172,7 @@ var Util    = {};
         city.color = color;
 
         for (var j = 0; j < 2; j++) {
-            var color = Util.Array.select(Color.random_cubes);
+            var color = Util.Array.select(Color.cubes);
             city.cubes[color] += 1;
         }
 
@@ -1185,7 +1188,7 @@ var Util    = {};
         Util.assert(city.western_link != City.WesternLinkState.NONE, "City cannot have a western link.");
 
         city.western_link = City.WesternLinkState.BUILT;
-        city.cubes[Color.colors.WEST] = 4;
+        city.cubes[Color.colors.RED] = 4;
 
         Game.pay(game_state, player_id, 30);
         Game.end_turn(game_state);
