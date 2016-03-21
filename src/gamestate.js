@@ -54,6 +54,10 @@ var Util    = {};
         return array[array.length - 1];
     };
 
+    Util.Array.contains = function(array, element) {
+        return array.indexOf(element) >= 0;
+    };
+
     Util.Array.remove = function(array, element) {
         var index = array.indexOf(element);
         if (index == -1) {
@@ -201,6 +205,14 @@ var Util    = {};
     // be placed as a random cube.
     Color.random_cubes = [
         Color.colors.RED,
+        Color.colors.YELLOW,
+        Color.colors.BLUE,
+        Color.colors.PURPLE,
+        Color.colors.BLACK,
+    ];
+
+    // The colors that can be selected for the urbanize action.
+    Color.urbanize_colors = [
         Color.colors.YELLOW,
         Color.colors.BLUE,
         Color.colors.PURPLE,
@@ -1143,6 +1155,25 @@ var Util    = {};
         Game.ensure_player_turn(game_state, player_id);
         Player.increment_engine(Game.get_player_by_id(game_state, player_id));
         Game.pay(game_state, player_id, Game.cost_for_engine(game_state, player_id));
+        Game.end_turn(game_state);
+    };
+
+    Action.urbanize = function(game_state, player_id, city_id, color) {
+        Game.ensure_player_turn(game_state, player_id);
+
+        Util.assert(Util.Array.contains(Color.urbanize_colors, color), "Invalid color");
+
+        var city = Map.get_city_by_id(game_state.map, city_id);
+        Util.assert(city.color == Color.colors.GRAY, "Invalid city color");
+
+        city.color = color;
+
+        for (var j = 0; j < 2; j++) {
+            var color = Util.Array.select(Color.random_cubes);
+            city.cubes[color] += 1;
+        }
+
+        Game.pay(game_state, player_id, 10);
         Game.end_turn(game_state);
     };
 

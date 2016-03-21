@@ -12,11 +12,11 @@ function create_test_game_one() {
     city0.color = root.Color.colors.YELLOW;
 
     var city1 = railf.City();
-    city1.size = 1;
+    city1.size = 4;
     city1.color = root.Color.colors.RED;
 
     var city2 = railf.City();
-    city2.size = 4;
+    city2.size = 1;
     city2.color = root.Color.colors.GRAY;
 
     var map = railf.Map();
@@ -1029,6 +1029,65 @@ describe("player actions", function() {
             expect(railp.get_engine(current_player)).toEqual(1);
             raila.upgrade_engine(game, current_player.id);
             expect(railp.get_engine(current_player)).toEqual(2);
+        });
+    });
+
+    describe("urbanize", function() {
+        var current_player;
+        var city;
+        var new_color;
+
+        beforeEach(function() {
+            current_player = railg.get_current_player(game);
+            city = railm.get_city_by_hex(game.map, railf.Hex(4,2));
+            new_color = root.Color.colors.BLUE;
+        });
+
+        it("works only for the current player", function() {
+            var next_player = railg.get_next_player(game);
+            
+            expect(function() {
+                raila.urbanize(game, next_player.id, city.id, new_color);
+            }).toThrowError(/not this player/);
+
+            expect(function() {
+                raila.urbanize(game, current_player.id, city.id, new_color);
+            }).not.toThrow();
+        });
+
+        it("ends the current player's turn", function() {
+            raila.urbanize(game, current_player.id, city.id, new_color);
+            expect(railg.end_turn).toHaveBeenCalledTimes(1);
+        });
+        
+        it("makes the player pay", function() {
+            spyOn(railg, "pay");
+            raila.urbanize(game, current_player.id, city.id, new_color);
+            expect(railg.pay).toHaveBeenCalledTimes(1);
+        });
+
+        it("fails if the selected color is red", function() {
+            expect(function() {
+                raila.urbanize(game, current_player.id, city.id, root.Color.colors.RED);
+            }).toThrowError(/invalid color/i);
+        });
+
+        it("fails if the selected city is not gray", function() {
+            var yellow_city = railm.get_city_by_hex(game.map, railf.Hex(0,2));
+            expect(function() {
+                raila.urbanize(game, current_player.id, yellow_city.id, root.Color.colors.BLUE);
+            }).toThrowError(/city color/i);
+        });
+
+        it("changes the color of the city", function() {
+            raila.urbanize(game, current_player.id, city.id, root.Color.colors.BLUE);
+            expect(city.color).toEqual(root.Color.colors.BLUE);
+        });
+
+        it("adds two cubes to the city", function() {
+            expect(railc.num_cubes_remaining(city)).toEqual(1);
+            raila.urbanize(game, current_player.id, city.id, root.Color.colors.BLUE);
+            expect(railc.num_cubes_remaining(city)).toEqual(3);
         });
     });
 });
