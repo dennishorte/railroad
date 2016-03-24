@@ -28,7 +28,11 @@ function create_test_game_one() {
     var settings = railf.Settings();
     settings.players = [2, 4, 9];
     settings.map = map;
-    return railg.new_game(settings);
+    
+    var game = railg.new_game(settings);
+    game.round = 1;
+
+    return game;
 };
 
 function set_current_player(game_state, player) {
@@ -313,6 +317,37 @@ describe("Game", function() {
                 railf.Hex(2,3),  //            /
             ];
             expect(railg.cost_for_track(game, path)).toEqual(2 + 4 + 2);
+        });
+    });
+
+    describe("end_player_turn", function() {
+        xit("only works for the current player", function() {
+        });
+
+        xit("advances to the next player", function() {
+        });
+
+        xit("advances the round marker after the last player", function() {
+        });
+
+        xit("calls end_game_turn after the last round finishes", function() {
+        });
+    });
+
+    describe("end_game_turn", function() {
+        xit("pays players", function() {
+        });
+
+        xit("resets the turn and round values", function() {
+        });
+
+        xit("sets the current player to the first player", function() {
+        });
+
+        xit("reveals a new operations card", function() {
+        });
+
+        xit("fails if the current round/player is not the last", function() {
         });
     });
 });
@@ -751,14 +786,7 @@ describe("player actions", function() {
 
     beforeEach(function() {
         game = create_test_game_one();
-
-        // Move to the action phase of the game.
-        var seats = railg.get_seats(game);
-        for (var i = 0; i < seats.length; i++) {
-            raila.pass_bidding(game, seats[i].id);
-        }
-
-        spyOn(railg, 'end_turn');
+        spyOn(railg, 'end_player_turn');
     });
 
     describe("pass_turn", function() {
@@ -772,7 +800,7 @@ describe("player actions", function() {
 
         it("ends the current player's turn", function() {
             raila.pass_turn(game, railg.get_current_player(game).id);
-            expect(railg.end_turn.calls.count()).toEqual(1);
+            expect(railg.end_player_turn.calls.count()).toEqual(1);
         });
     });
 
@@ -797,7 +825,7 @@ describe("player actions", function() {
 
         it("ends the current player's turn", function() {
             raila.build_track(game, current_player.id, short_track);
-            expect(railg.end_turn).toHaveBeenCalledTimes(1);
+            expect(railg.end_player_turn).toHaveBeenCalledTimes(1);
         });
 
         it("fails if the user doesn't build any tracks", function() {
@@ -906,7 +934,7 @@ describe("player actions", function() {
         it("ends the current player's turn", function() {
             var city = railm.get_city_by_hex(game.map, railf.Hex(4,2));
             raila.deliver_goods(game, current_player.id, city.id, [track_b_id, track_c_id]);
-            expect(railg.end_turn).toHaveBeenCalledTimes(1);
+            expect(railg.end_player_turn).toHaveBeenCalledTimes(1);
         });
 
         it("fails if the user doesn't control the first segment", function() {
@@ -1026,7 +1054,7 @@ describe("player actions", function() {
 
         it("ends the current player's turn", function() {
             raila.upgrade_engine(game, current_player.id);
-            expect(railg.end_turn).toHaveBeenCalledTimes(1);
+            expect(railg.end_player_turn).toHaveBeenCalledTimes(1);
         });
         
         it("makes the player pay", function() {
@@ -1076,7 +1104,7 @@ describe("player actions", function() {
 
         it("ends the current player's turn", function() {
             raila.urbanize(game, current_player.id, city.id, new_color);
-            expect(railg.end_turn).toHaveBeenCalledTimes(1);
+            expect(railg.end_player_turn).toHaveBeenCalledTimes(1);
         });
         
         it("makes the player pay", function() {
@@ -1134,7 +1162,7 @@ describe("player actions", function() {
 
         it("ends the current player's turn", function() {
             raila.western_link(game, current_player.id, city.id);
-            expect(railg.end_turn).toHaveBeenCalledTimes(1);
+            expect(railg.end_player_turn).toHaveBeenCalledTimes(1);
         });
         
         it("makes the player pay", function() {

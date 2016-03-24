@@ -686,7 +686,11 @@ var Util    = {};
         }
     };
 
-    Game.end_turn = function(game_state, player_id) {
+    Game.end_player_turn = function(game_state, player_id) {
+        Util.not_ready();
+    };
+
+    Game.end_game_turn = function(game_state) {
         Util.not_ready();
     };
 
@@ -1022,9 +1026,19 @@ var Util    = {};
         return new_track;
     };
 
+    /**
+     This is not intended for bidding actions. See ensure_player_bid for that.
+     */
     Game.ensure_player_turn = function(game_state, player_id) {
         var current_player = Game.get_current_player(game_state);
         Util.assert(current_player.id == player_id, "It is not this player's turn.");
+        Util.assert(!Game.is_bidding_round(game_state), "It is currently a bidding round.");
+    };
+
+    Game.ensure_player_bid = function(game_state, player_id) {
+        var current_player = Game.get_current_player(game_state);
+        Util.assert(current_player.id == player_id, "It is not this player's turn.");
+        Util.assert(Game.is_bidding_round(game_state), "It is not a bidding round.");
     };
 
 }());
@@ -1032,8 +1046,7 @@ var Util    = {};
 (function() {
     // Public API
     Action.bid_for_first_seat = function(game_state, player_id, amount) {
-        Util.assert(Game.is_bidding_round(game_state), "Not a bidding round.");
-        Util.assert(Game.get_current_player(game_state).id == player_id, "Not the current player.");
+        Game.ensure_player_bid(game_state, player_id);
         
         var top_bid = Game.get_top_bid(game_state);
         Util.assert(top_bid < amount, "Bid is not higher than previous build.");
@@ -1046,7 +1059,7 @@ var Util    = {};
 
     // Public API
     Action.pass_bidding = function(game_state, player_id) {
-        Util.assert(Game.is_bidding_round(game_state), "Not a bidding round.");
+        Game.ensure_player_bid(game_state, player_id);
 
         var player = Game.get_player_by_id(game_state, player_id);
         Util.assert(Game.get_current_player(game_state).id == player_id, "Not the current player.");
@@ -1057,7 +1070,7 @@ var Util    = {};
     // Public API
     Action.pass_turn = function(game_state, player_id) {
         Game.ensure_player_turn(game_state, player_id);
-        Game.end_turn(game_state, player_id);
+        Game.end_player_turn(game_state, player_id);
     };
 
     // Public API
@@ -1071,7 +1084,7 @@ var Util    = {};
         var cost = Game.cost_for_track(game_state, path);
         
         Game.pay(game_state, player_id, cost);
-        Game.end_turn(game_state, player_id);
+        Game.end_player_turn(game_state, player_id);
     };
 
     /**
@@ -1151,14 +1164,14 @@ var Util    = {};
             Player.add_points(player, points[player.id]);
         });
 
-        Game.end_turn(game_state);
+        Game.end_player_turn(game_state);
     };
 
     Action.upgrade_engine = function(game_state, player_id) {
         Game.ensure_player_turn(game_state, player_id);
         Player.increment_engine(Game.get_player_by_id(game_state, player_id));
         Game.pay(game_state, player_id, Game.cost_for_engine(game_state, player_id));
-        Game.end_turn(game_state);
+        Game.end_player_turn(game_state);
     };
 
     Action.urbanize = function(game_state, player_id, city_id, color) {
@@ -1177,7 +1190,7 @@ var Util    = {};
         }
 
         Game.pay(game_state, player_id, 10);
-        Game.end_turn(game_state);
+        Game.end_player_turn(game_state);
     };
 
     Action.western_link = function(game_state, player_id, city_id) {
@@ -1191,7 +1204,7 @@ var Util    = {};
         city.cubes[Color.colors.RED] = 4;
 
         Game.pay(game_state, player_id, 30);
-        Game.end_turn(game_state);
+        Game.end_player_turn(game_state);
     };
 
 }());
