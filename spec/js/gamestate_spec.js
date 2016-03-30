@@ -321,33 +321,136 @@ describe("Game", function() {
     });
 
     describe("end_player_turn", function() {
-        xit("only works for the current player", function() {
+        var current_player;
+
+        beforeEach(function() {
+            game = create_test_game_one();
+            current_player = railg.get_current_player(game);
         });
 
-        xit("advances to the next player", function() {
+        it("works only for the current player", function() {
+            var next_player = railg.get_next_player(game);
+            
+            expect(function() {
+                railg.end_player_turn(game, next_player.id);
+            }).toThrowError(/not this player/);
+
+            expect(function() {
+                railg.end_player_turn(game, current_player.id);
+            }).not.toThrow();
         });
 
-        xit("advances the round marker after the last player", function() {
+        it("advances to the next player", function() {
+            var next_player = railg.get_next_player(game);
+            railg.end_player_turn(game, current_player.id);
+            expect(railg.get_current_player(game)).toEqual(next_player);
         });
 
-        xit("calls end_game_turn after the last round finishes", function() {
+        it("advances the round marker after the last player", function() {
+            expect(game.round).toEqual(1);
+            var seats = railg.get_seats(game);
+            seats.forEach(function(player) {
+                railg.end_player_turn(game, player.id);
+            });
+            expect(game.round).toEqual(2);
+        });
+
+        it("calls end_game_turn after the last round finishes", function() {
+            spyOn(railg, "end_game_turn");
+            game.round = 3;
+            game.current_seat = railg.get_last_seat(game);
+            railg.end_player_turn(game, railg.get_last_player(game).id);
+            expect(railg.end_game_turn).toHaveBeenCalledTimes(1);
         });
     });
 
     describe("end_game_turn", function() {
-        xit("pays players", function() {
+        beforeEach(function() {
+            game = create_test_game_one();
+            game.round = 4;
+            game.current_seat = railg.get_first_seat(game);
+            if (game.current_seat < 0) {
+                game.current_seat = game.players.length - 1;
+            }
         });
 
-        xit("resets the turn and round values", function() {
+        it("fails if not the last round of the turn", function() {
+            game.round = 2;
+            expect(function() {
+                railg.end_game_turn(game);
+            }).toThrowError(/end of the round/i);
         });
 
-        xit("sets the current player to the first player", function() {
+        it("fails if the current player is not the last player", function() {
+            game.current_seat = railg.get_last_seat(game);
+            expect(function() { railg.end_game_turn(game); }).toThrowError(/first player/i);
         });
 
-        xit("reveals a new operations card", function() {
+        it("removes incomplete tracks", function() {
+            var path_a = [
+                railf.Hex(0,2),
+                railf.Hex(1,2),
+                railf.Hex(2,2),
+            ];
+            var path_b = [
+                railf.Hex(0,2),
+                railf.Hex(1,1),
+                railf.Hex(2,1),
+                railf.Hex(3,1),
+            ];
+
+            var current_player = railg.get_current_player(game);
+
+            railg.add_track(game, current_player.id, path_b);
+            railg.add_track(game, current_player.id, path_a);
+
+            railg.end_game_turn(game);
+
+            var tracks = railg.get_track_array(game);
+            expect(tracks.length).toEqual(1);
+            expect(tracks[0].path).toEqual(path_a);
         });
 
-        xit("fails if the current round/player is not the last", function() {
+        it("pays players", function() {
+            var seats = railg.get_seats(game);
+            seats[0].points = 1;
+            seats[1].points = 5;
+            seats[1].shares = 1;
+            seats[2].points = 1;
+            seats[2].shares = 1;
+
+            railg.end_game_turn(game);
+
+            expect(seats[0].money).toEqual(3);
+            expect(seats[1].money).toEqual(6);
+            expect(seats[2].money).toEqual(2);
+        });
+
+        it("increments the turn", function() {
+            var initial_turn = game.turn;
+            railg.end_game_turn(game);
+            expect(game.turn).toEqual(initial_turn + 1);
+        });
+
+        it("resets the round value", function() {
+            railg.end_game_turn(game);
+            expect(railg.is_bidding_round(game)).toEqual(true);
+        });
+
+        it("sets the current player to the first player", function() {
+            railg.end_game_turn(game);
+            expect(railg.get_current_player(game)).toEqual(railg.get_first_player(game));
+        });
+
+        it("reveals a new operations card", function() {
+            spyOn(railg, "add_card");
+            railg.end_game_turn(game);
+            expect(railg.add_card).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe("add_card", function() {
+        xit("adds a new cards to the available cards", function() {
         });
     });
 });

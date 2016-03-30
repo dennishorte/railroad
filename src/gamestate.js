@@ -58,13 +58,16 @@ var Util    = {};
         return array.indexOf(element) >= 0;
     };
 
+    /**
+     Returns an array of the removed elements.
+     */
     Util.Array.remove = function(array, element) {
         var index = array.indexOf(element);
         if (index == -1) {
-            return array;
+            return [];
         }
         else {
-            return array.splice(index, 1);  // In place, but return the value for chaining.
+            return array.splice(index, 1);
         }
     };
 
@@ -604,6 +607,30 @@ var Util    = {};
     Game.BiddingRound = 0;
     Game.NumRounds    = 3; // Actual number of play rounds (doesn't include bidding).
 
+    Game.score_to_income = {
+         0: 0,  1: 3,  2: 4,  3: 5,  4: 6,
+         5: 7,  6: 8,  7: 9,  8:10,  9:11,
+        10:12, 11:13, 12:14, 13:15, 14:15,
+        15:16, 16:16, 17:17, 18:17, 19:18,
+        20:18, 21:19, 22:19, 23:19, 24:20,
+        25:20, 26:20, 27:21, 28:21, 29:21,
+        30:22, 31:22, 32:22, 33:23, 34:23,
+        35:23, 36:23, 37:24, 38:24, 29:24,
+        40:24, 41:25, 42:25, 43:25, 44:25,
+        45:25, 46:26, 47:25, 48:25, 49:24,
+        50:24, 51:24, 52:24, 53:23, 54:23,
+        55:23, 56:23, 57:22, 58:22, 59:22,
+        60:22, 61:21, 62:21, 63:21, 64:21,
+        65:20, 66:20, 67:20, 68:19, 69:19,
+        70:19, 71:18, 72:18, 73:18, 74:17,
+        75:17, 76:17, 77:16, 78:16, 79:16,
+        80:15, 81:15, 82:15, 83:14, 84:14,
+        85:14, 86:13, 87:13, 88:13, 89:12,
+        90:12, 91:12, 92:11, 93:11, 94:11,
+        95:10, 96:10, 97:10, 98: 9, 99:9,
+        100:9
+    };
+
     Game.new_game = function(settings) {
         Util.assert(
             2 <= settings.players.length && settings.players.length <= 6, 
@@ -687,11 +714,48 @@ var Util    = {};
     };
 
     Game.end_player_turn = function(game_state, player_id) {
-        Util.not_ready();
+        Game.ensure_player_turn(game_state, player_id);
+
+        game_state.current_seat = Game.get_next_seat(game_state);
+
+        if (Game.get_current_seat(game_state) == Game.get_first_seat(game_state)) {
+            game_state.round += 1;
+        }
+
+        if (game_state.round > 3) {
+            Game.end_game_turn(game_state);
+        }
     };
 
     Game.end_game_turn = function(game_state) {
-        Util.not_ready();
+        Util.assert(game_state.round > 3, "Not the end of the round.");
+        Util.assert(Game.get_current_seat(game_state) == Game.get_first_seat(game_state), "Have not returned to the first player.");
+
+        game_state.turn += 1;
+        game_state.round = Game.BiddingRound;
+        game_state.current_seat = game.first_seat;
+
+        // Look for incomplete tracks and remove them.
+        var tracks = Game.get_track_array(game_state);
+        for (var i = 0; i < tracks.length; i++) {
+            if (!tracks[i].complete) {
+                tracks.splice(i, 1);
+                i -= 1;
+            }
+        }
+
+        // Income
+        var seats = Game.get_seats(game_state);
+        for (var i = 0; i < seats.length; i++) {
+            var player = seats[i];
+            var earnings = Game.score_to_income[player.points] - player.shares;
+            Game.pay(game_state, player.id, -earnings); // Pay negative amount (usually)
+        }
+
+        Game.add_card(game_state);
+    };
+
+    Game.add_card = function(game_state) {
     };
 
     Game.pay = function(game_state, player_id, amount) {
@@ -705,6 +769,10 @@ var Util    = {};
 
     Game.get_first_player = function(game_state) {
         return game_state.players[game_state.first_seat];
+    };
+
+    Game.get_first_seat = function(game_state) {
+        return game_state.first_seat;
     };
     
     Game.get_current_player = function(game_state) {
@@ -721,6 +789,14 @@ var Util    = {};
 
     Game.get_current_seat = function(game_state) {
         return game_state.current_seat;
+    };
+
+    Game.get_last_seat = function(game_state) {
+        return game_state.first_seat == 0 ? game_state.players.length - 1 : game_state.first_seat - 1;
+    };
+
+    Game.get_last_player = function(game_state) {
+        return game_state.players[Game.get_last_seat(game_state)];
     };
 
     Game.get_next_seat = function(game_state) {
