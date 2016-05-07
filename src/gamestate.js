@@ -1,5 +1,6 @@
 
 var Action  = {};
+var Cards   = {};  // Not exported
 var City    = {};
 var Color   = {};
 var Factory = {};
@@ -10,6 +11,7 @@ var Util    = {};
 
 (function() {
     exports.Action  = Action;
+    exports.Cards   = Cards;
     exports.City    = City;
     exports.Color   = Color;
     exports.Factory = Factory;
@@ -17,6 +19,168 @@ var Util    = {};
     exports.Map     = Map;
     exports.Player  = Player;
     exports.Util    = Util;
+}());
+
+(function() {
+    Cards.MajorTypes = {
+        ETERNAL     : 1,
+        ACHIEVEMENT : 2,
+        ACTION      : 3,
+        IMMEDIATE   : 4,
+    };
+
+    Cards.MinorTypes = {
+        HOTEL          : 1,
+        MAJOR_LINE     : 2,
+        SERVICE_BOUNTY : 3,
+        RAILROAD_ERA   : 4,
+        SPEED_RECORD   : 5,
+        NEW_TRAIN      : 6,
+        LAND_GRANT     : 7,
+        NEW_INDUSTRY   : 8,
+        EXECUTIVE      : 9,
+        PERFECT_ENG    : 10,
+        CITY_GROWTH    : 11,
+    };
+
+    var f = {};
+    Cards.Factory = f;
+
+    f[Cards.MinorTypes.SERVICE_BOUNTY] = function(city, points) {
+        return {
+            major_type: Cards.MajorTypes.ACHIEVEMENT,
+            minor_type: Cards.MinorTypes.SERVICE_BOUNTY,
+            name: "Service Bounty: " + city.name,
+            text: "The first player to deliver a goods cube to " + city.name + " gains " + points.toString() + " points.",
+            city_id: city.id,
+            points: points,
+        };
+    };
+
+    f[Cards.MinorTypes.HOTEL] = function(city) {
+        return {
+            major_type: Cards.MajorTypes.ACHIEVEMENT,
+            minor_type: Cards.MinorTypes.HOTEL,
+            name: "Hotel: " + city.name,
+            text: "Gain 1 point on the income track for each goods cube delivered to " + city.name + "(regardless of which player makes the delivery).",
+            city_id: city.id,
+        };
+    };
+
+    f[Cards.MinorTypes.MAJOR_LINE] = function(city1, city2, points, with_link) {
+        var link_text = with_link ? " (with a western link)" : "";
+
+        return {
+            major_type: Cards.MajorTypes.ETERNAL,
+            minor_type: Cards.MinorTypes.MAJOR_LINE,
+            name: "Major Line: " + city1.name + " to " + city2.name,
+            text: "The first player to connect " + city1.name + " and " + city2.name + link_text + " gains " + points.toString() + " on the income track.",
+            city1_id: city1.id,
+            city2_id: city2.id,
+            points: points,
+            with_link: with_link,
+        };
+    };
+
+    f[Cards.MinorTypes.RAILROAD_ERA] = function() {
+        return {
+            name: "The Railroad Era Begins",
+            text: "The first player to deliver a goods cube games 1 additional point on the income track.",
+            major_type: Cards.MajorTypes.ACHIEVEMENT,
+            minor_type: Cards.MinorTypes.RAILROAD_ERA,
+            starting: true,
+        };
+    };
+
+    f[Cards.MinorTypes.SPEED_RECORD] = function() {
+        return {
+            name: "Speed Record",
+            text: "The first player to make a 3-link delivery gains 3 additional points on the income track.",
+            major_type: Cards.MajorTypes.ACHIEVEMENT,
+            minor_type: Cards.MinorTypes.SPEED_RECORD,
+            starting: true,
+        };
+    };
+
+    f[Cards.MinorTypes.NEW_TRAIN] = function() {
+        return {
+            name: "New Train",
+            text: "The first player to upgrade to a level 4 train gains 4 points on the income track.",
+            major_type: Cards.MajorTypes.ACHIEVEMENT,
+            minor_type: Cards.MinorTypes.NEW_TRAIN,
+            starting: true,
+        };
+    };
+
+    f[Cards.MinorTypes.LAND_GRANT] = function() {
+        return {
+            name: "Government Land Grant",
+            text: "All track built on open terrain during a single future build track action is free.",
+            major_type: Cards.MajorTypes.ACTION,
+            minor_type: Cards.MinorTypes.LAND_GRANT,
+        };
+    };
+
+    f[Cards.MinorTypes.NEW_INDUSTRY] = function() {
+        return {
+            name: "New Industry",
+            text: "Immediately place a free 'New City' tile in the gray city of your choice.",
+            major_type: Cards.MajorTypes.IMMEDIATE,
+            minor_type: Cards.MinorTypes.NEW_INDUSTRY,
+        };
+    };
+
+    f[Cards.MinorTypes.EXECUTIVE] = function() {
+        return {
+            name: "Railroad Executive",
+            text: "The player taking this card may immediately take 2 actions.",
+            major_type: Cards.MajorTypes.IMMEDIATE,
+            minor_type: Cards.MinorTypes.EXECUTIVE,
+        };
+    };
+
+    f[Cards.MinorTypes.PERFECT_ENG] = function() {
+        return {
+            name: "Perfect Engineering",
+            text: "Lay up to 5 track segments in a single link.",
+            major_type: Cards.MajorTypes.ETERNAL,
+            minor_type: Cards.MinorTypes.PERFECT_ENG,
+        };
+    };
+
+    f[Cards.MinorTypes.CITY_GROWTH] = function() {
+        return {
+            name: "City Growth",
+            text: "Add 2 new random goods cubes to any single city of your choice.",
+            major_type: Cards.MajorTypes.IMMEDIATE,
+            minor_type: Cards.MinorTypes.CITY_GROWTH,
+        };
+    };
+
+    /**
+     Takes as arguments a bunch of Cards.MinorTypes, one for each card in the deck. If the
+     MinorType requires arguments, it is assumed that the next element passed into the
+     function will be an array of the args.
+     */
+    Cards.DeckFactory = function() {
+        var deck = [];
+
+        for (var i = 0; i < arguments.length; i++) {
+            var f = Cards.Factory[arguments[i]];
+            if (f.length > 0) {
+                deck.push(f.apply(this, arguments[i + 1]));
+                i++;
+            }
+            else {
+                deck.push(f());
+            }
+        }
+        for (var i = 0; i < deck.length; i++) {
+            deck[i].id = i + 1;
+        }
+
+        return deck;
+    };
 }());
 
 (function() {
@@ -28,10 +192,6 @@ var Util    = {};
             }
             throw message; // Fallback
         }
-    };
-
-    Util.log = function(game_state, log_entry) {
-        game_state.log.push(log_entry);
     };
 
     Util.not_ready = function() {
@@ -168,10 +328,18 @@ var Util    = {};
         };
     };
 
+    /**
+     The deck in the game state is tightly linked to the map, since many cards reference
+     cities on the map. I made the decision not to put it directly on the map because a map
+     can also have different decks (eg. the difference between the original Railroad Tycoon
+     and the newer Railways of the World).
+     */
     Factory.GameState = function() {
         return {
             players       : [],  // An array of player objects.
             tracks        : [],  // An array of track objects.
+            map           : {},  // A Factory.Map object.
+            deck          : [],  // The cards for this game.
             first_seat    :  0,  // changes each turn
             current_seat  :  0,
             round         :  0,  // 3 rounds per turn + round 0 = bidding for first player
@@ -601,6 +769,18 @@ var Util    = {};
         player.engine += 1;
     };
 
+    Player.get_cards = function(player) {
+        return player.cards;
+    };
+
+    Player.add_card = function(player, card_id) {
+        player.cards.push(card_id);
+    };
+
+    Player.remove_card = function(player, card_id) {
+        Util.Array.remove(player.cards, card_id);
+    };
+
 }());
 
 (function() {
@@ -817,6 +997,27 @@ var Util    = {};
                 return game_state.players[i];
             }
         }
+    };
+
+    Game.get_card_by_id = function(game_state, card_id) {
+        for (var i = 0; i < game_state.deck.length; i++) {
+            if (game_state.deck[i].id == card_id) {
+                return game_state.deck[i];
+            }
+        }
+        Util.assert(false, "Unable to find card with id = " + card_id.toString());
+    };
+
+    /**
+     Returns an array containing the actual cards the specified player has (not just the
+     card ids).
+     */
+    Game.get_cards_for_player = function(game_state, player_id) {
+        var player = Game.get_player_by_id(game_state, player_id);
+        var card_ids = Player.get_cards(player);
+        return card_ids.map(function(card_id) {
+            return Game.get_card_by_id(game_state, card_id);
+        });
     };
 
     /**
@@ -1238,6 +1439,16 @@ var Util    = {};
         // Give the player points.
         Game.get_seats(game_state).forEach(function(player) {
             Player.add_points(player, points[player.id]);
+        });
+
+        // Award points for hotels.
+        Game.get_seats(game_state).forEach(function(player) {
+            var player_cards = Game.get_cards_for_player(game_state, player.id);
+            player_cards.forEach(function(card) {
+                if (card.minor_type == Cards.MinorTypes.HOTEL && card.city_id == dest_city.id) {
+                    Player.add_points(player, 1);
+                };
+            });
         });
 
         Game.end_player_turn(game_state);

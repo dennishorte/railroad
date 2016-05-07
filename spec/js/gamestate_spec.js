@@ -6,17 +6,24 @@ var railg = root.Game;
 var railm = root.Map;
 var railp = root.Player;
 
-function create_test_game_one() {
-    var city0 = railf.City();
-    city0.size = 3;
+function create_test_game_one_settings() {
+
+    var city0   = railf.City();
+    city0.id    = 1;
+    city0.size  = 3;
+    city0.name  = "Oakland";
     city0.color = root.Color.colors.YELLOW;
 
-    var city1 = railf.City();
-    city1.size = 4;
+    var city1   = railf.City();
+    city1.id    = 2;
+    city1.size  = 4;
+    city1.name  = "San Francisco";
     city1.color = root.Color.colors.RED;
 
-    var city2 = railf.City();
-    city2.size = 1;
+    var city2   = railf.City();
+    city2.id    = 3;
+    city2.size  = 1;
+    city2.name  = "El Cerrito";
     city2.color = root.Color.colors.GRAY;
 
     var map = railf.Map();
@@ -28,12 +35,46 @@ function create_test_game_one() {
     var settings = railf.Settings();
     settings.players = [2, 4, 9];
     settings.map = map;
-    
+
+    return settings;
+};
+
+function create_test_game_one() {
+    var settings = create_test_game_one_settings();
     var game = railg.new_game(settings);
     game.round = 1;
-
     return game;
 };
+
+// function create_test_game_one_with_cards() {
+//     var settings = create_test_game_one_settings();
+
+//     var deck = root.Cards.DeckFactory(
+//         Cards.MinorTypes.SERVICE_BOUNTY, [railm.get_city_by_id(1), 3],
+//         Cards.MinorTypes.HOTEL         , [railm.get_city_by_id(2)],
+//         Cards.MinorTypes.MAJOR_LINE    , [railm.get_city_by_id(1), railm.get_city_by_id(3), 5, false],
+//         Cards.MinorTypes.RAILROAD_ERA  ,
+//         Cards.MinorTypes.SPEED_RECORD  ,
+//         Cards.MinorTypes.NEW_TRAIN     ,
+//         Cards.MinorTypes.LAND_GRANT    ,
+//         Cards.MinorTypes.LAND_GRANT    ,
+//         Cards.MinorTypes.NEW_INDUSTRY  ,
+//         Cards.MinorTypes.NEW_INDUSTRY  ,
+//         Cards.MinorTypes.NEW_INDUSTRY  ,
+//         Cards.MinorTypes.NEW_INDUSTRY  ,
+//         Cards.MinorTypes.EXECUTIVE     ,
+//         Cards.MinorTypes.EXECUTIVE     ,
+//         Cards.MinorTypes.PERFECT_ENG   ,
+//         Cards.MinorTypes.PERFECT_ENG   ,
+//         Cards.MinorTypes.CITY_GROWTH
+//         Cards.MinorTypes.CITY_GROWTH
+//         Cards.MinorTypes.CITY_GROWTH
+//     );
+
+//     var game = railg.new_game(settings);
+//     game.round = 1;
+//     return game;
+// };
 
 function set_current_player(game_state, player) {
     var seats = railg.get_seats(game_state);
@@ -45,6 +86,65 @@ function set_current_player(game_state, player) {
     }
     throw new Error("Couldn't find player.");
 };
+
+describe("Cards", function() {
+    var Cards = root.Cards;
+
+    describe("DeckFactory", function() {
+        it("creates card objects", function() {
+            var deck = Cards.DeckFactory(
+                Cards.MinorTypes.CITY_GROWTH,
+                Cards.MinorTypes.PERFECT_ENG
+            );
+
+            expect(deck.length).toEqual(2);
+        });
+
+        it("allows parameters", function() {
+            var city = railf.City();
+            city.name = "New York";
+            city.id = 8;
+
+            var deck = Cards.DeckFactory(
+                Cards.MinorTypes.CITY_GROWTH,
+                Cards.MinorTypes.HOTEL, [city],
+                Cards.MinorTypes.RAILROAD_ERA,
+                Cards.MinorTypes.SERVICE_BOUNTY, [city, 3]
+            );
+
+            expect(deck.length).toEqual(4);
+            expect(deck[1].city_id).toEqual(city.id);
+            expect(deck[3].city_id).toEqual(city.id);
+        });
+
+        it("assigns unique ids to each card", function() {
+            var city = railf.City();
+            city.name = "New York";
+            city.id = 8;
+
+            var deck = Cards.DeckFactory(
+                Cards.MinorTypes.CITY_GROWTH,
+                Cards.MinorTypes.HOTEL, [city],
+                Cards.MinorTypes.RAILROAD_ERA,
+                Cards.MinorTypes.SERVICE_BOUNTY, [city, 3]
+            );
+
+            var ids = deck.map(function(card) {
+                return card.id;
+            });
+
+            ids.sort();
+
+            for (var i = 1; i < ids.length; i++) {
+                expect(ids[i - 1]).not.toEqual(ids[i]);
+            }
+
+            for (var i = 0; i < ids.length; i++) {
+                expect(ids[i] > 0).toEqual(true);
+            }
+        });
+    });
+});
 
 describe("Map", function() {
     var map;
@@ -1114,6 +1214,39 @@ describe("player actions", function() {
             expect(railc.num_cubes_remaining(city)).toEqual(1);
             expect(city.cubes[root.Color.colors.RED]).toEqual(0);
             expect(city.cubes[root.Color.colors.YELLOW]).toEqual(1);
+        });
+
+        describe("hotels", function() {
+
+            var deck;
+            
+            beforeEach(function() {
+                var Cards = root.Cards;
+                var city = railm.get_city_by_hex(game.map, railf.Hex(2,2));
+                deck = Cards.DeckFactory(
+                    Cards.MinorTypes.HOTEL, [city]
+                );
+                game.deck = deck;
+            });
+
+            it("pays hotel owners if they are the current player", function() {
+                railp.add_card(current_player, deck[0].id);
+                expect(current_player.points).toEqual(0);
+
+                var city = railm.get_city_by_hex(game.map, railf.Hex(4,2));
+                raila.deliver_goods(game, current_player.id, city.id, [track_b_id, track_a_id]);
+                expect(current_player.points).toEqual(2 + 1); // 2 for delivery, 1 for hotel.
+            });
+
+            it("pays hotel owners if they are NOT the current player", function() {
+                railp.add_card(next_player, deck[0].id);
+                expect(next_player.points).toEqual(0);
+
+                var city = railm.get_city_by_hex(game.map, railf.Hex(4,2));
+                raila.deliver_goods(game, current_player.id, city.id, [track_b_id, track_a_id]);
+                expect(current_player.points).toEqual(2);
+                expect(next_player.points).toEqual(1);
+            });
         });
 
         describe("western link cubes", function() {
