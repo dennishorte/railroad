@@ -22,6 +22,75 @@ var Util    = {};
 }());
 
 (function() {
+    Util.assert = function(condition, message) {
+        if (!condition) {
+            message = message || "Assertion failed";
+            if (typeof Error !== "undefined") {
+                throw new Error(message);
+            }
+            throw message; // Fallback
+        }
+    };
+
+    Util.not_ready = function() {
+        message = "Not yet implemented.";
+        if (typeof Error !== "undefined") {
+            throw new Error(message);
+        }
+        throw message; // Fallback
+    };
+
+    Util.random_int = function(max) {
+        return Math.floor(Math.random() * max);
+    };
+
+
+
+    Util.Array = {};
+
+    Util.Array.back = function(array) {
+        return array[array.length - 1];
+    };
+
+    Util.Array.contains = function(array, element) {
+        return array.indexOf(element) >= 0;
+    };
+
+    /**
+     Returns an array of the removed elements.
+     */
+    Util.Array.remove = function(array, element) {
+        var index = array.indexOf(element);
+        if (index == -1) {
+            return [];
+        }
+        else {
+            return array.splice(index, 1);
+        }
+    };
+
+    Util.Array.select = function(array) {
+        return array[Util.random_int(array.length)];
+    };
+
+    Util.Array.shuffle = function (array) {
+        var currentIndex = array.length;
+        var temporaryValue, randomIndex;
+
+        while (0 !== currentIndex) {
+            randomIndex = Math.floor(Math.random() * currentIndex);
+            currentIndex -= 1;
+            temporaryValue = array[currentIndex];
+            array[currentIndex] = array[randomIndex];
+            array[randomIndex] = temporaryValue;
+        }
+
+        return array;
+    };
+
+}());
+
+(function() {
     Cards.MajorTypes = {
         ETERNAL     : 1,
         ACHIEVEMENT : 2,
@@ -181,75 +250,6 @@ var Util    = {};
 
         return deck;
     };
-}());
-
-(function() {
-    Util.assert = function(condition, message) {
-        if (!condition) {
-            message = message || "Assertion failed";
-            if (typeof Error !== "undefined") {
-                throw new Error(message);
-            }
-            throw message; // Fallback
-        }
-    };
-
-    Util.not_ready = function() {
-        message = "Not yet implemented.";
-        if (typeof Error !== "undefined") {
-            throw new Error(message);
-        }
-        throw message; // Fallback
-    };
-
-    Util.random_int = function(max) {
-        return Math.floor(Math.random() * max);
-    };
-
-
-
-    Util.Array = {};
-
-    Util.Array.back = function(array) {
-        return array[array.length - 1];
-    };
-
-    Util.Array.contains = function(array, element) {
-        return array.indexOf(element) >= 0;
-    };
-
-    /**
-     Returns an array of the removed elements.
-     */
-    Util.Array.remove = function(array, element) {
-        var index = array.indexOf(element);
-        if (index == -1) {
-            return [];
-        }
-        else {
-            return array.splice(index, 1);
-        }
-    };
-
-    Util.Array.select = function(array) {
-        return array[Util.random_int(array.length)];
-    };
-
-    Util.Array.shuffle = function (array) {
-        var currentIndex = array.length;
-        var temporaryValue, randomIndex;
-
-        while (0 !== currentIndex) {
-            randomIndex = Math.floor(Math.random() * currentIndex);
-            currentIndex -= 1;
-            temporaryValue = array[currentIndex];
-            array[currentIndex] = array[randomIndex];
-            array[randomIndex] = temporaryValue;
-        }
-
-        return array;
-    };
-
 }());
 
 (function() {
