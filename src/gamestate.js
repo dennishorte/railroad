@@ -128,7 +128,7 @@ var Util    = {};
 
     f[Cards.MinorTypes.HOTEL] = function(city) {
         return {
-            major_type: Cards.MajorTypes.ACHIEVEMENT,
+            major_type: Cards.MajorTypes.ETERNAL,
             minor_type: Cards.MinorTypes.HOTEL,
             name: "Hotel: " + city.name,
             text: "Gain 1 point on the income track for each goods cube delivered to " + city.name + "(regardless of which player makes the delivery).",
@@ -140,7 +140,7 @@ var Util    = {};
         var link_text = with_link ? " (with a western link)" : "";
 
         return {
-            major_type: Cards.MajorTypes.ETERNAL,
+            major_type: Cards.MajorTypes.ACHIEVEMENT,
             minor_type: Cards.MinorTypes.MAJOR_LINE,
             name: "Major Line: " + city1.name + " to " + city2.name,
             text: "The first player to connect " + city1.name + " and " + city2.name + link_text + " gains " + points.toString() + " on the income track.",
