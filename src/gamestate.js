@@ -340,6 +340,7 @@ var Util    = {};
             tracks        : [],  // An array of track objects.
             map           : {},  // A Factory.Map object.
             deck          : [],  // The cards for this game.
+            active_cards  : [],  // Cards available for players to take/use (ids).
             first_seat    :  0,  // changes each turn
             current_seat  :  0,
             round         :  0,  // 3 rounds per turn + round 0 = bidding for first player
@@ -1040,6 +1041,16 @@ var Util    = {};
         Util.assert(false, "Invalid player_id received.");
     };
 
+    Game.get_active_cards = function(game_state) {
+        return game_state.active_cards.map(function(card_id) {
+            return Game.get_card_by_id(game_state, card_id);
+        });
+    };
+
+    Game.remove_active_card_id = function(game_state, card_id) {
+        Util.Array.remove(game_state.active_cards, card_id);
+    };
+
     Game.get_top_bid = function(game_state) {
         return Game.get_top_bidder(game_state).bid;
     };
@@ -1449,6 +1460,14 @@ var Util    = {};
                     Player.add_points(player, 1);
                 };
             });
+        });
+
+        // Award points for service bounties.
+        Game.get_active_cards(game_state).forEach(function(card) {
+            if (card.minor_type == Cards.MinorTypes.SERVICE_BOUNTY && card.city_id == dest_city.id) {
+                Player.add_points(Game.get_current_player(game_state), card.points);
+                Game.remove_active_card_id(game_state, card.id);
+            }
         });
 
         Game.end_player_turn(game_state);

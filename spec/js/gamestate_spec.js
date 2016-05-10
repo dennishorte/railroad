@@ -1216,10 +1216,8 @@ describe("player actions", function() {
             expect(city.cubes[root.Color.colors.YELLOW]).toEqual(1);
         });
 
-        describe("hotels", function() {
-
+        describe("hotel cards", function() {
             var deck;
-            
             beforeEach(function() {
                 var Cards = root.Cards;
                 var city = railm.get_city_by_hex(game.map, railf.Hex(2,2));
@@ -1246,6 +1244,32 @@ describe("player actions", function() {
                 raila.deliver_goods(game, current_player.id, city.id, [track_b_id, track_a_id]);
                 expect(current_player.points).toEqual(2);
                 expect(next_player.points).toEqual(1);
+            });
+        });
+
+        describe("service bounty cards", function() {
+            var deck;
+            beforeEach(function() {
+                var Cards = root.Cards;
+                var city = railm.get_city_by_hex(game.map, railf.Hex(2,2));
+                deck = Cards.DeckFactory(
+                    Cards.MinorTypes.SERVICE_BOUNTY, [city, 3]
+                );
+                game.deck = deck;
+                game.active_cards = [deck[0].id];
+            });
+            
+            it("gives points when someone delivers to them", function() {
+                expect(current_player.points).toEqual(0);
+                var city = railm.get_city_by_hex(game.map, railf.Hex(4,2));
+                raila.deliver_goods(game, current_player.id, city.id, [track_b_id, track_a_id]);
+                expect(current_player.points).toEqual(2 + 3); // 2 for delivery, 3 for bounty.
+            });
+
+            it("is removed from the active cards after use", function() {
+                var city = railm.get_city_by_hex(game.map, railf.Hex(4,2));
+                raila.deliver_goods(game, current_player.id, city.id, [track_b_id, track_a_id]);
+                expect(root.Util.Array.contains(game.active_cards, deck[0].id)).toEqual(false);
             });
         });
 
