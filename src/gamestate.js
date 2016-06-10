@@ -341,6 +341,7 @@ var Util    = {};
             map           : {},  // A Factory.Map object.
             deck          : [],  // The cards for this game.
             active_cards  : [],  // Cards available for players to take/use (ids).
+            cards_dealt   : [],  // A list of card ids that have been drawn/dealt from the deck.
             first_seat    :  0,  // changes each turn
             current_seat  :  0,
             round         :  0,  // 3 rounds per turn + round 0 = bidding for first player
@@ -539,6 +540,18 @@ var Util    = {};
             }
         }
         Util.assert(false, "No city found at hex.");
+    };
+
+    Map.get_city_at_other_end_of_track = function(map, track, city_id) {
+        Util.assert(track.complete, "Track is not complete.");
+        var city = Map.get_city_by_id(map, city_id);
+        var city_hex = City.get_hex(city);
+        if (Map.Hex.is_equal(track.path[0], city_hex)) {
+            return Map.get_city_by_hex(map, Util.Array.back(track.path));
+        }
+        else {
+            return Map.get_city_by_hex(map, track.path[0]);
+        }
     };
 
     Map.get_terrain = function(map, hex) {
@@ -937,6 +950,7 @@ var Util    = {};
     };
 
     Game.add_card = function(game_state) {
+        Util.not_ready();
     };
 
     Game.pay = function(game_state, player_id, amount) {
@@ -1097,7 +1111,7 @@ var Util    = {};
         for (var i = 0; i < game_state.tracks.length; i++) {
             var track = game_state.tracks[i];
             var path = track.path;
-            for (var j = 1; j < path.length - 1; j++) { // Don't check endpoints.
+            for (var j = 0; j < path.length; j++) {
                 if (Map.Hex.is_equal(path[j], hex)) {
                     tracks.push(track);
                 }
@@ -1315,6 +1329,64 @@ var Util    = {};
     };
 
     /**
+     Test if the specified player has completed a major line. To test for all players, call
+     iteratively for each player.
+
+     @return
+     A list of card objects of completed major lines.
+     */
+    Game.check_for_major_lines = function(game_state, player_id) {
+        var completed = [];
+        game_state.active_cards.forEach(function(card_id) {
+            var card = Game.get_card_by_id(game_state, card_id);
+            if (card.minor_type == Cards.MinorTypes.MAJOR_LINE) {
+                if (card.with_link) {
+                    Util.not_ready();
+                }
+
+                var connected = Game.test_if_cities_connected_by_player(
+                    game_state,
+                    player_id,
+                    card.city1_id,
+                    card.city2_id
+                );
+
+                if (connected) {
+                    completed.push(card);
+                }
+            }
+        });
+        return completed;
+    };
+
+    Game.test_if_cities_connected_by_player = function(game_state, player_id, city1_id, city2_id) {
+        var cities = [Map.get_city_by_id(game_state.map, city1_id)];
+        var city_index = 0;
+
+        var connected = false;
+        while (!connected && city_index < cities.length) {
+            var city = cities[city_index];
+            var city_hex = City.get_hex(city);
+
+            Game.get_tracks_by_hex(game_state, City.get_hex(city)).forEach(function(track) {
+                if (track.owner == player_id) {
+                    var next_city = Map.get_city_at_other_end_of_track(game_state.map, track, city.id);
+                    if (next_city.id == city2_id) {
+                        connected = true;
+                    }
+                    else if (Util.Array.contains(cities, next_city) == false) {
+                        cities.push(next_city);
+                    }
+                }
+            });
+
+            city_index += 1;
+        }
+
+        return connected;
+    };
+
+    /**
      This is not intended for bidding actions. See ensure_player_bid for that.
      */
     Game.ensure_player_turn = function(game_state, player_id) {
@@ -1370,8 +1442,16 @@ var Util    = {};
         // Most of the error checking for valid tracks is done in this function.
         var new_track = Game.add_track(game_state, player_id, path);
         var cost = Game.cost_for_track(game_state, path);
-        
+
         Game.pay(game_state, player_id, cost);
+
+        // Test if a major line was completed.
+        Game.check_for_major_lines(game_state, player_id).forEach(function(card) {
+            var player = Game.get_player_by_id(game_state, player_id);
+            Player.add_points(player, card.points);
+            Game.remove_active_card_id(game_state, card.id);
+        });
+        
         Game.end_player_turn(game_state, player_id);
     };
 

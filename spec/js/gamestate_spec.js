@@ -206,6 +206,11 @@ describe("Game", function() {
         settings.map = railf.Map();
         game = railg.new_game(settings);
     });
+
+    xdescribe("add_card", function() {
+        // Take the top card from the deck, if any, and add it to the active_cards.
+        // Don't deal cards that have already been dealt.
+    });
     
     describe("add_track", function() {
         it("fails if the player already has a track connecting these cities", function() {
@@ -466,6 +471,7 @@ describe("Game", function() {
 
     describe("end_game_turn", function() {
         beforeEach(function() {
+            spyOn(railg, "add_card");
             game = create_test_game_one();
             game.round = 4;
             game.current_seat = railg.get_first_seat(game);
@@ -543,7 +549,6 @@ describe("Game", function() {
         });
 
         it("reveals a new operations card", function() {
-            spyOn(railg, "add_card");
             railg.end_game_turn(game);
             expect(railg.add_card).toHaveBeenCalledTimes(1);
         });
@@ -551,6 +556,9 @@ describe("Game", function() {
 
     describe("add_card", function() {
         xit("adds a new cards to the available cards", function() {
+        });
+
+        xit("triggers major line operations cards if they are flipped", function() {
         });
     });
 });
@@ -1066,6 +1074,41 @@ describe("player actions", function() {
             expect(railg.cost_for_track.calls.count()).toEqual(1);
             expect(railg.pay.calls.count()).toEqual(1);
         });
+
+        it("awards points for major lines if completed", function() {
+            // Add a major line card to the card row.
+            var Cards = root.Cards;
+            var city0 = railm.get_city_by_hex(game.map, railf.Hex(0,2));
+            var city1 = railm.get_city_by_hex(game.map, railf.Hex(4,2));
+            game.deck = Cards.DeckFactory(
+                Cards.MinorTypes.MAJOR_LINE, [city0, city1, 30, false]
+            );
+            game.active_cards = [game.deck[0].id];
+
+            // Build part of the major line (so we can complete it as our action.
+            railg.add_track(game, current_player.id, [
+                railf.Hex(0,2),
+                railf.Hex(1,2),
+                railf.Hex(2,2),
+            ]);
+
+            // Check the pre-conditions.
+            expect(railp.get_score(current_player)).toEqual(0);
+            expect(game.active_cards.length).toEqual(1);
+
+            // Build the pieces of the major line.
+            raila.build_track(game, current_player.id, [
+                railf.Hex(2,2),
+                railf.Hex(3,2),
+                railf.Hex(4,2),
+            ]);
+            
+            // Expect to get points for the card.
+            expect(railp.get_score(current_player)).toEqual(30);
+
+            // Expect the card to be gone from the row.
+            expect(game.active_cards.length).toEqual(0);
+        });
     });
 
     describe("deliver_goods", function() {
@@ -1454,6 +1497,9 @@ describe("player actions", function() {
         it("updates the western link state of the city", function() {
             raila.western_link(game, current_player.id, city.id);
             expect(city.western_link).toEqual(railc.WesternLinkState.BUILT);
+        });
+
+        xit("awards points for major lines if completed", function() {
         });
     });
 });
