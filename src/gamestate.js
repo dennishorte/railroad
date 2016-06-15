@@ -1340,15 +1340,12 @@ var Util    = {};
         game_state.active_cards.forEach(function(card_id) {
             var card = Game.get_card_by_id(game_state, card_id);
             if (card.minor_type == Cards.MinorTypes.MAJOR_LINE) {
-                if (card.with_link) {
-                    Util.not_ready();
-                }
-
                 var connected = Game.test_if_cities_connected_by_player(
                     game_state,
                     player_id,
                     card.city1_id,
-                    card.city2_id
+                    card.city2_id,
+                    card.with_link
                 );
 
                 if (connected) {
@@ -1359,22 +1356,30 @@ var Util    = {};
         return completed;
     };
 
-    Game.test_if_cities_connected_by_player = function(game_state, player_id, city1_id, city2_id) {
+    Game.test_if_cities_connected_by_player = function(game_state, player_id, city1_id, city2_id, with_link) {
         var cities = [Map.get_city_by_id(game_state.map, city1_id)];
         var city_index = 0;
 
         var connected = false;
-        while (!connected && city_index < cities.length) {
+        var has_western_link = !with_link; // If not needed, set to true.
+        while (city_index < cities.length) {
             var city = cities[city_index];
             var city_hex = City.get_hex(city);
+
+
+            if (city.western_link == City.WesternLinkState.BUILT) {
+                has_western_link = true;
+            }
+
+            if (city.id == city2_id) {
+                connected = true;
+                break;
+            }
 
             Game.get_tracks_by_hex(game_state, City.get_hex(city)).forEach(function(track) {
                 if (track.owner == player_id) {
                     var next_city = Map.get_city_at_other_end_of_track(game_state.map, track, city.id);
-                    if (next_city.id == city2_id) {
-                        connected = true;
-                    }
-                    else if (Util.Array.contains(cities, next_city) == false) {
+                    if (Util.Array.contains(cities, next_city) == false) {
                         cities.push(next_city);
                     }
                 }
@@ -1383,7 +1388,7 @@ var Util    = {};
             city_index += 1;
         }
 
-        return connected;
+        return connected && has_western_link;
     };
 
     /**
@@ -1590,6 +1595,14 @@ var Util    = {};
         city.cubes[Color.colors.RED] = 4;
 
         Game.pay(game_state, player_id, 30);
+
+        // Test if a major line was completed.
+        Game.check_for_major_lines(game_state, player_id).forEach(function(card) {
+            var player = Game.get_player_by_id(game_state, player_id);
+            Player.add_points(player, card.points);
+            Game.remove_active_card_id(game_state, card.id);
+        });
+
         Game.end_player_turn(game_state);
     };
 

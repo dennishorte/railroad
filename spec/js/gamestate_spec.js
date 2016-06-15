@@ -1499,7 +1499,40 @@ describe("player actions", function() {
             expect(city.western_link).toEqual(railc.WesternLinkState.BUILT);
         });
 
-        xit("awards points for major lines if completed", function() {
+        it("awards points for major lines if completed", function() {
+            // Add a major line card to the card row.
+            var Cards = root.Cards;
+            var city0 = railm.get_city_by_hex(game.map, railf.Hex(0,2));
+            var city1 = railm.get_city_by_hex(game.map, railf.Hex(4,2));
+            game.deck = Cards.DeckFactory(
+                Cards.MinorTypes.MAJOR_LINE, [city0, city1, 30, true]
+            );
+            game.active_cards = [game.deck[0].id];
+
+            // Build part of the major line (so we can complete it as our action).
+            railg.add_track(game, current_player.id, [
+                railf.Hex(0,2),
+                railf.Hex(1,2),
+                railf.Hex(2,2),
+            ]);
+            railg.add_track(game, current_player.id, [
+                railf.Hex(2,2),
+                railf.Hex(3,2),
+                railf.Hex(4,2),
+            ]);
+
+            // Check the pre-conditions.
+            expect(railp.get_score(current_player)).toEqual(0);
+            expect(game.active_cards.length).toEqual(1);
+
+            // Build the western link.
+            raila.western_link(game, current_player.id, city.id);
+            
+            // Expect to get points for the card.
+            expect(railp.get_score(current_player)).toEqual(30);
+
+            // Expect the card to be gone from the row.
+            expect(game.active_cards.length).toEqual(0);
         });
     });
 });
