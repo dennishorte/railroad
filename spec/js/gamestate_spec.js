@@ -555,11 +555,35 @@ describe("Game", function() {
     });
 
     describe("add_card", function() {
-        xit("adds a new cards to the available cards", function() {
+        var Cards = root.Cards;
+
+        it("adds a new card to the available cards", function() {
+            game.deck = Cards.DeckFactory(
+                Cards.MinorTypes.RAILROAD_ERA
+            );
+
+            // Preconditions
+            expect(game.active_cards.length).toEqual(0);
+            expect(game.cards_dealt.length).toEqual(0);
+
+            railg.add_card(game);
+            expect(game.active_cards.length).toEqual(1);
+            expect(game.cards_dealt.length).toEqual(1);
+        });
+
+        it("does nothing if the deck is empty", function() {
+            // Preconditions
+            expect(game.active_cards.length).toEqual(0);
+            expect(game.cards_dealt.length).toEqual(0);
+
+            railg.add_card(game);
+            expect(game.active_cards.length).toEqual(0);
+            expect(game.cards_dealt.length).toEqual(0);
         });
 
         xit("triggers major line operations cards if they are flipped", function() {
         });
+
     });
 });
 

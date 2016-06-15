@@ -950,7 +950,13 @@ var Util    = {};
     };
 
     Game.add_card = function(game_state) {
-        Util.not_ready();
+        var remaining_cards = Game.get_remaining_cards(game_state);
+        if (remaining_cards.length > 0) {
+            Util.Array.shuffle(remaining_cards);
+            var card = remaining_cards[0];
+            game_state.active_cards.push(card.id);
+            game_state.cards_dealt.push(card.id);
+        }
     };
 
     Game.pay = function(game_state, player_id, amount) {
@@ -1012,6 +1018,16 @@ var Util    = {};
                 return game_state.players[i];
             }
         }
+    };
+
+    Game.get_remaining_cards = function(game_state) {
+        var remaining_cards = [];
+        game_state.deck.forEach(function(card) {
+            if (!Util.Array.contains(game_state.cards_dealt, card.id)) {
+                remaining_cards.push(card.id);
+            }
+        });
+        return remaining_cards;
     };
 
     Game.get_card_by_id = function(game_state, card_id) {
