@@ -581,7 +581,35 @@ describe("Game", function() {
             expect(game.cards_dealt.length).toEqual(0);
         });
 
-        xit("triggers major line operations cards if they are flipped", function() {
+        it("triggers major line operations cards if they are flipped", function() {
+            game = create_test_game_one();
+
+            // Add a major line card to the card row.
+            var Cards = root.Cards;
+            var city0 = railm.get_city_by_hex(game.map, railf.Hex(0,2));
+            var city1 = railm.get_city_by_hex(game.map, railf.Hex(4,2));
+            game.deck = Cards.DeckFactory(
+                Cards.MinorTypes.MAJOR_LINE, [city0, city1, 30, false]
+            );
+
+            // Build the major line.
+            var current_player = railg.get_current_player(game);
+            railg.add_track(game, current_player.id, [
+                railf.Hex(0,2),
+                railf.Hex(1,2),
+                railf.Hex(2,2),
+            ]);
+            railg.add_track(game, current_player.id, [
+                railf.Hex(2,2),
+                railf.Hex(3,2),
+                railf.Hex(4,2),
+            ]);
+            
+            // Preconditions
+            expect(railp.get_score(current_player)).toEqual(0);
+
+            railg.add_card(game);
+            expect(railp.get_score(current_player)).toEqual(30);
         });
 
     });

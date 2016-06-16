@@ -956,12 +956,19 @@ var Util    = {};
         }
         
         Util.Array.shuffle(remaining_cards);
-        var card = remaining_cards[0];
-        game_state.active_cards.push(card.id);
-        game_state.cards_dealt.push(card.id);
+        var card_id = remaining_cards[0];
+        game_state.active_cards.push(card);
+        game_state.cards_dealt.push(card);
 
+        // Note: If multiple players have completed the major line, all will be awarded
+        //  the prize.
+        var card = Game.get_card_by_id(game_state, card_id);
         if (card.minor_type == Cards.MinorTypes.MAJOR_LINE) {
-            var connected = Game.test_major_line_card_for_player(game_state, player_id, card);
+            Game.get_seats(game_state).forEach(function(player) {
+                if (Game.test_major_line_card_for_player(game_state, player.id, card)) {
+                    Game.claim_achievement_card(game_state, player.id, card.id);
+                }
+            });
         }
         
     };
