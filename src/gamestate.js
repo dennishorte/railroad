@@ -951,12 +951,19 @@ var Util    = {};
 
     Game.add_card = function(game_state) {
         var remaining_cards = Game.get_remaining_cards(game_state);
-        if (remaining_cards.length > 0) {
-            Util.Array.shuffle(remaining_cards);
-            var card = remaining_cards[0];
-            game_state.active_cards.push(card.id);
-            game_state.cards_dealt.push(card.id);
+        if (remaining_cards.length == 0) {
+            return;
         }
+        
+        Util.Array.shuffle(remaining_cards);
+        var card = remaining_cards[0];
+        game_state.active_cards.push(card.id);
+        game_state.cards_dealt.push(card.id);
+
+        if (card.minor_type == Cards.MinorTypes.MAJOR_LINE) {
+            var connected = Game.test_major_line_card_for_player(game_state, player_id, card);
+        }
+        
     };
 
     Game.pay = function(game_state, player_id, amount) {
@@ -1079,6 +1086,16 @@ var Util    = {};
 
     Game.remove_active_card_id = function(game_state, card_id) {
         Util.Array.remove(game_state.active_cards, card_id);
+    };
+
+    Game.claim_achievement_card = function(game_state, player_id, card_id) {
+        var player = Game.get_player_by_id(game_state, player_id);
+        var card = Game.get_card_by_id(game_state, card_id);
+
+        Util.assert(card.major_type == Cards.MajorTypes.ACHIEVEMENT, "Card is not an achievement.");
+
+        Player.add_points(player, card.points);
+        Game.remove_active_card_id(game_state, card_id);
     };
 
     Game.get_top_bid = function(game_state) {
@@ -1356,12 +1373,8 @@ var Util    = {};
         game_state.active_cards.forEach(function(card_id) {
             var card = Game.get_card_by_id(game_state, card_id);
             if (card.minor_type == Cards.MinorTypes.MAJOR_LINE) {
-                var connected = Game.test_if_cities_connected_by_player(
-                    game_state,
-                    player_id,
-                    card.city1_id,
-                    card.city2_id,
-                    card.with_link
+                var connected = Game.test_major_line_card_for_player(
+                    game_state, player_id, card
                 );
 
                 if (connected) {
@@ -1370,6 +1383,16 @@ var Util    = {};
             }
         });
         return completed;
+    };
+
+    Game.test_major_line_card_for_player = function(game_state, player_id, card) {
+        return Game.test_if_cities_connected_by_player(
+            game_state,
+            player_id,
+            card.city1_id,
+            card.city2_id,
+            card.with_link
+        );
     };
 
     Game.test_if_cities_connected_by_player = function(game_state, player_id, city1_id, city2_id, with_link) {
@@ -1468,9 +1491,7 @@ var Util    = {};
 
         // Test if a major line was completed.
         Game.check_for_major_lines(game_state, player_id).forEach(function(card) {
-            var player = Game.get_player_by_id(game_state, player_id);
-            Player.add_points(player, card.points);
-            Game.remove_active_card_id(game_state, card.id);
+            Game.claim_achievement_card(game_state, player_id, card.id);
         });
         
         Game.end_player_turn(game_state, player_id);
@@ -1566,8 +1587,7 @@ var Util    = {};
         // Award points for service bounties.
         Game.get_active_cards(game_state).forEach(function(card) {
             if (card.minor_type == Cards.MinorTypes.SERVICE_BOUNTY && card.city_id == dest_city.id) {
-                Player.add_points(Game.get_current_player(game_state), card.points);
-                Game.remove_active_card_id(game_state, card.id);
+                Game.claim_achievement_card(game_state, player_id, card.id);
             }
         });
 
@@ -1614,9 +1634,7 @@ var Util    = {};
 
         // Test if a major line was completed.
         Game.check_for_major_lines(game_state, player_id).forEach(function(card) {
-            var player = Game.get_player_by_id(game_state, player_id);
-            Player.add_points(player, card.points);
-            Game.remove_active_card_id(game_state, card.id);
+            Game.claim_achievement_card(game_state, player_id, card.id);
         });
 
         Game.end_player_turn(game_state);
