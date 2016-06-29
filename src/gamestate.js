@@ -154,10 +154,11 @@ var Util    = {};
     f[Cards.MinorTypes.RAILROAD_ERA] = function() {
         return {
             name: "The Railroad Era Begins",
-            text: "The first player to deliver a goods cube games 1 additional point on the income track.",
+            text: "The first player to deliver a goods cube gains 1 additional point on the income track.",
             major_type: Cards.MajorTypes.ACHIEVEMENT,
             minor_type: Cards.MinorTypes.RAILROAD_ERA,
             starting: true,
+            points: 1,
         };
     };
 
@@ -168,6 +169,7 @@ var Util    = {};
             major_type: Cards.MajorTypes.ACHIEVEMENT,
             minor_type: Cards.MinorTypes.SPEED_RECORD,
             starting: true,
+            points: 3,
         };
     };
 
@@ -178,6 +180,7 @@ var Util    = {};
             major_type: Cards.MajorTypes.ACHIEVEMENT,
             minor_type: Cards.MinorTypes.NEW_TRAIN,
             starting: true,
+            points: 4,
         };
     };
 
@@ -1591,8 +1594,16 @@ var Util    = {};
             });
         });
 
-        // Award points for service bounties.
+        // Claim achievement cards.
         Game.get_active_cards(game_state).forEach(function(card) {
+            // railroad era begins
+            // If the card is present in the card row, it clearly hasn't been claimed yet,
+            // so there is no special checking for if this was the first goods cube delivered.
+            if (card.minor_type == Cards.MinorTypes.RAILROAD_ERA) {
+                Game.claim_achievement_card(game_state, player_id, card.id);
+            }
+
+            // service bounty
             if (card.minor_type == Cards.MinorTypes.SERVICE_BOUNTY && card.city_id == dest_city.id) {
                 Game.claim_achievement_card(game_state, player_id, card.id);
             }

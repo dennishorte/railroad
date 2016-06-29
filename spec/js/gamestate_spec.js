@@ -1311,6 +1311,20 @@ describe("player actions", function() {
             expect(city.cubes[root.Color.colors.YELLOW]).toEqual(1);
         });
 
+        it("triggers railroad era cards the first time a good is delivered", function() {
+            var Cards = root.Cards;
+            game.deck = Cards.DeckFactory(
+                Cards.MinorTypes.RAILROAD_ERA
+            );
+            game.active_cards = [game.deck[0].id];
+
+            var city = railm.get_city_by_hex(game.map, railf.Hex(4,2));
+            raila.deliver_goods(game, current_player.id, city.id, [track_b_id, track_c_id]);
+
+            expect(railp.get_score(current_player)).toEqual(1 + 1);
+            expect(game.active_cards.length).toEqual(0);
+        });
+
         describe("hotel cards", function() {
             var deck;
             beforeEach(function() {
