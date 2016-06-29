@@ -1595,6 +1595,8 @@ var Util    = {};
         });
 
         // Claim achievement cards.
+        // TODO: Will this break if there are more cards after the one we remove from the
+        //   deck? What if more than one achievement is claimed at a time?
         Game.get_active_cards(game_state).forEach(function(card) {
             // railroad era begins
             // If the card is present in the card row, it clearly hasn't been claimed yet,
@@ -1603,8 +1605,12 @@ var Util    = {};
                 Game.claim_achievement_card(game_state, player_id, card.id);
             }
 
+            else if (card.minor_type == Cards.MinorTypes.SPEED_RECORD && segment_ids.length >= 3) {
+                Game.claim_achievement_card(game_state, player_id, card.id);
+            }
+
             // service bounty
-            if (card.minor_type == Cards.MinorTypes.SERVICE_BOUNTY && card.city_id == dest_city.id) {
+            else if (card.minor_type == Cards.MinorTypes.SERVICE_BOUNTY && card.city_id == dest_city.id) {
                 Game.claim_achievement_card(game_state, player_id, card.id);
             }
         });

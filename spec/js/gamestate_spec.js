@@ -26,11 +26,18 @@ function create_test_game_one_settings() {
     city2.name  = "El Cerrito";
     city2.color = root.Color.colors.GRAY;
 
+    var city3   = railf.City();
+    city3.id    = 4;
+    city3.size  = 1;
+    city3.name  = "Pinole";
+    city3.color = root.Color.colors.BLUE;
+
     var map = railf.Map();
     railm.Builder.initialize_terrain(map, 5, 5);
     railm.Builder.insert_city(map, city0, 0, 2);
     railm.Builder.insert_city(map, city1, 2, 2);
     railm.Builder.insert_city(map, city2, 4, 2);
+    railm.Builder.insert_city(map, city3, 1, 4);
 
     var settings = railf.Settings();
     settings.players = [2, 4, 9];
@@ -1214,6 +1221,7 @@ describe("player actions", function() {
             var cubes42 = railf.Cubes();
             cubes42[root.Color.colors.RED   ] = 1;
             cubes42[root.Color.colors.YELLOW] = 1;
+            cubes42[root.Color.colors.BLUE  ] = 1;
             adjust_cubes(game, railf.Hex(4,2), cubes42);
         });
 
@@ -1304,10 +1312,11 @@ describe("player actions", function() {
 
         it("removes the correct cube from the source city", function() {
             var city = railm.get_city_by_hex(game.map, railf.Hex(4,2));
-            expect(railc.num_cubes_remaining(city)).toEqual(2);
+            expect(railc.num_cubes_remaining(city)).toEqual(3);
             raila.deliver_goods(game, current_player.id, city.id, [track_b_id, track_a_id]);
-            expect(railc.num_cubes_remaining(city)).toEqual(1);
+            expect(railc.num_cubes_remaining(city)).toEqual(2);
             expect(city.cubes[root.Color.colors.RED]).toEqual(0);
+            expect(city.cubes[root.Color.colors.BLUE]).toEqual(1);
             expect(city.cubes[root.Color.colors.YELLOW]).toEqual(1);
         });
 
@@ -1323,6 +1332,44 @@ describe("player actions", function() {
 
             expect(railp.get_score(current_player)).toEqual(1 + 1);
             expect(game.active_cards.length).toEqual(0);
+        });
+
+        describe("speed record cards", function() {
+            var city;
+            var track_d_id;
+            beforeEach(function() {
+                var path = [
+                    railf.Hex(2,2),
+                    railf.Hex(2,3),
+                    railf.Hex(2,4),
+                    railf.Hex(1,4)
+                ];
+
+                track_d_id = railg.add_track(game, next_player.id, path).id;
+
+                var Cards = root.Cards;
+                game.deck = Cards.DeckFactory(
+                    Cards.MinorTypes.SPEED_RECORD
+                );
+                game.active_cards = [game.deck[0].id];
+
+                city = railm.get_city_by_hex(game.map, railf.Hex(4,2));
+
+                railp.increment_engine(current_player);
+            });
+
+            it("trigger for deliveries of length >= 3", function() {
+                raila.deliver_goods(game, current_player.id, city.id, [track_b_id, track_a_id, track_d_id]);
+                expect(railp.get_score(current_player)).toEqual(2 + 3);
+                expect(railp.get_score(next_player)).toEqual(1);
+                expect(game.active_cards.length).toEqual(0);
+            });
+
+            it("don't trigger for deliveries of length < 3", function() {
+                raila.deliver_goods(game, current_player.id, city.id, [track_b_id, track_a_id]);
+                expect(railp.get_score(current_player)).toEqual(2);
+                expect(game.active_cards.length).toEqual(1);
+            });
         });
 
         describe("hotel cards", function() {
