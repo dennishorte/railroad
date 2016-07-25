@@ -1493,6 +1493,30 @@ describe("player actions", function() {
             raila.upgrade_engine(game, current_player.id);
             expect(railp.get_engine(current_player)).toEqual(2);
         });
+
+        describe("new engine card", function() {
+            beforeEach(function() {
+                var Cards = root.Cards;
+                game.deck = Cards.DeckFactory(
+                    Cards.MinorTypes.NEW_TRAIN
+                );
+                game.active_cards = [game.deck[0].id];
+            });
+
+            it("is not claimed when a player upgrades engine to level 3", function() {
+                current_player.engine = 2;
+                raila.upgrade_engine(game, current_player.id);
+                expect(railp.get_score(current_player)).toEqual(0);
+                expect(game.active_cards.length).toEqual(1);
+            });
+
+            it("is claimed when a player upgrades their engine to level 4", function() {
+                current_player.engine = 3;
+                raila.upgrade_engine(game, current_player.id);
+                expect(railp.get_score(current_player)).toEqual(4);
+                expect(game.active_cards.length).toEqual(0);
+            });
+        });
     });
 
     describe("urbanize", function() {

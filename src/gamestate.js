@@ -1622,6 +1622,18 @@ var Util    = {};
         Game.ensure_player_turn(game_state, player_id);
         Player.increment_engine(Game.get_player_by_id(game_state, player_id));
         Game.pay(game_state, player_id, Game.cost_for_engine(game_state, player_id));
+
+        // Test if the new train achievement was completed.
+        var player = Game.get_player_by_id(game_state, player_id);
+        if (Player.get_engine(player) == 4) {
+            game_state.active_cards.forEach(function(card_id) {
+                var card = Game.get_card_by_id(game_state, card_id);
+                if (card.minor_type == Cards.MinorTypes.NEW_TRAIN) {
+                    Game.claim_achievement_card(game_state, player_id, card.id);
+                }
+            });
+        }
+
         Game.end_player_turn(game_state);
     };
 
