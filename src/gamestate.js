@@ -319,6 +319,7 @@ var Util    = {};
             engine  :  1,  // Level of this player's engine.
             bid     :  0,  // Used only during bidding
             cards   : [],  // Cards this player is holding (ids)
+            land_grant: false,  // true if the player used a land grant card this turn.
         };
     };
 
@@ -798,6 +799,14 @@ var Util    = {};
         Util.Array.remove(player.cards, card_id);
     };
 
+    Player.set_land_grant = function(player, value) {
+        player.land_grant = value;
+    };
+
+    Player.get_land_grant = function(player) {
+        return player.land_grant;
+    };
+
 }());
 
 (function() {
@@ -1238,15 +1247,25 @@ var Util    = {};
         return costs[engine];
     };
 
-    Game.cost_for_track = function(game_state, path) {
+    /**
+     * @param player_id Players may have special effects that alter the cost of track.
+     */
+    Game.cost_for_track = function(game_state, player_id, path) {
         var map = game_state.map;
+        var land_grant = Player.get_land_grant(Game.get_player_by_id(game_state, player_id));
         
         var cost = 0;
         for (var i = 1; i < path.length - 1; i++) {
             // Terrain cost
             var terrain  = Map.get_terrain(map, path[i]);
-            var hex_cost = Map.Terrain.properties[terrain].cost;
-            Util.assert(hex_cost > 0, "Invalid hex cost.");
+            var hex_cost;
+            if (terrain == Map.Terrain.PLAINS && land_grant) {
+                hex_cost = 0;
+            }
+            else {
+                hex_cost = Map.Terrain.properties[terrain].cost;
+                Util.assert(hex_cost > 0, "Invalid hex cost.");
+            }
             cost += hex_cost;
 
             // Existing track test.
@@ -1440,6 +1459,10 @@ var Util    = {};
         return connected && has_western_link;
     };
 
+    Game.ensure_not_land_grant = function(game_state, player_id) {
+        return !Player.get_land_grant(Game.get_player_by_id(game_state, player_id))
+    };
+
     /**
      This is not intended for bidding actions. See ensure_player_bid for that.
      */
@@ -1493,9 +1516,12 @@ var Util    = {};
         Util.assert(path.length >= 3, "No tracks specified.");
         Util.assert(path.length <= 6, "Only 4 hexes of track can be built at a time.");
 
+        // Do this before the new track is added to the game so we don't think we're crossing
+        // our own track.
+        var cost = Game.cost_for_track(game_state, player_id, path);
+
         // Most of the error checking for valid tracks is done in this function.
         var new_track = Game.add_track(game_state, player_id, path);
-        var cost = Game.cost_for_track(game_state, path);
 
         Game.pay(game_state, player_id, cost);
 
@@ -1504,6 +1530,7 @@ var Util    = {};
             Game.claim_achievement_card(game_state, player_id, card.id);
         });
         
+        Player.set_land_grant(Game.get_player_by_id(game_state, player_id), false);
         Game.end_player_turn(game_state, player_id);
     };
 
@@ -1518,6 +1545,7 @@ var Util    = {};
      */
     Action.deliver_goods = function(game_state, player_id, source_id, segment_ids, color) {
         Game.ensure_player_turn(game_state, player_id);
+        Game.ensure_not_land_grant(game_state, player_id);
         var player = Game.get_player_by_id(game_state, player_id);
 
         Util.assert(
@@ -1620,6 +1648,8 @@ var Util    = {};
 
     Action.upgrade_engine = function(game_state, player_id) {
         Game.ensure_player_turn(game_state, player_id);
+        Game.ensure_not_land_grant(game_state, player_id);
+
         Player.increment_engine(Game.get_player_by_id(game_state, player_id));
         Game.pay(game_state, player_id, Game.cost_for_engine(game_state, player_id));
 
@@ -1639,6 +1669,7 @@ var Util    = {};
 
     Action.urbanize = function(game_state, player_id, city_id, color) {
         Game.ensure_player_turn(game_state, player_id);
+        Game.ensure_not_land_grant(game_state, player_id);
 
         Util.assert(Util.Array.contains(Color.urbanize_colors, color), "Invalid color");
 
@@ -1658,6 +1689,7 @@ var Util    = {};
 
     Action.western_link = function(game_state, player_id, city_id) {
         Game.ensure_player_turn(game_state, player_id);
+        Game.ensure_not_land_grant(game_state, player_id);
 
         var city = Map.get_city_by_id(game_state.map, city_id);
         Util.assert(city.western_link != City.WesternLinkState.BUILT, "Western link is already built.");
@@ -1675,5 +1707,21 @@ var Util    = {};
 
         Game.end_player_turn(game_state);
     };
+    
+    Action.play_action_card = function(game_state, player_id, card_id) {
+        Game.ensure_player_turn(game_state, player_id);
+        Game.ensure_not_land_grant(game_state, player_id);
+        
+        var player = Game.get_player_by_id(game_state, player_id);
+        var cards = Player.get_cards(player);
 
+        Util.assert(Util.Array.contains(cards, card_id), "Doesn't have that card.");
+
+        // Note: playing an action card does not implicitly end the turn.
+        
+        var card = Game.get_card_by_id(game_state, card_id);
+        if (card.minor_type == Cards.MinorTypes.LAND_GRANT) {
+            Player.set_land_grant(player, true);
+        }
+    };
 }());

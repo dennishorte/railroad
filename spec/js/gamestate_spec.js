@@ -350,8 +350,11 @@ describe("Game", function() {
     });
 
     describe("cost_for_track", function() {
+        var player;
+
         beforeEach(function() {
             game = create_test_game_one();
+            player = railg.get_first_player(game);
 
             // Modify the terrain so that it contains all the different types.
             // p p c p p
@@ -383,7 +386,7 @@ describe("Game", function() {
                 railf.Hex(3,2),  // river  = 3
                 railf.Hex(4,2),
             ];
-            expect(railg.cost_for_track(game, path)).toEqual(2 + 4 + 3);
+            expect(railg.cost_for_track(game, player.id, path)).toEqual(2 + 4 + 3);
         });
 
         it("works correctly across ridges", function() {
@@ -394,7 +397,7 @@ describe("Game", function() {
                 railf.Hex(2,3),  // hills  = 4 /
                 railf.Hex(2,2),
             ];
-            expect(railg.cost_for_track(game, path)).toEqual(2 + 4 + 4 + 4);
+            expect(railg.cost_for_track(game, player.id, path)).toEqual(2 + 4 + 4 + 4);
         });
 
         it("works correctly across existing tracks", function() {
@@ -415,7 +418,7 @@ describe("Game", function() {
                 railf.Hex(2,2),
             ];
 
-            expect(railg.cost_for_track(game, path2)).toEqual(2 + 4 + 4 + 4 + 2);
+            expect(railg.cost_for_track(game, player.id, path2)).toEqual(2 + 4 + 4 + 4 + 2);
         });
 
         it("charges half the cost for a ridge if you don't cross it yet", function() {
@@ -428,7 +431,7 @@ describe("Game", function() {
                 railf.Hex(1,3),  // hills  = 4 \__ half ridge = 2
                 railf.Hex(2,3),  //            /
             ];
-            expect(railg.cost_for_track(game, path)).toEqual(2 + 4 + 2);
+            expect(railg.cost_for_track(game, player.id, path)).toEqual(2 + 4 + 2);
         });
     });
 
@@ -456,6 +459,9 @@ describe("Game", function() {
             var next_player = railg.get_next_player(game);
             railg.end_player_turn(game, current_player.id);
             expect(railg.get_current_player(game)).toEqual(next_player);
+        });
+
+        xit("doesn't advance to the next player if using the executive card", function() {
         });
 
         it("advances the round marker after the last player", function() {
@@ -1119,6 +1125,33 @@ describe("player actions", function() {
             expect(function() { raila.build_track(game, current_player.id, long_track); }).toThrowError(/4 hexes/);
         });
 
+        xit("allows building 5 tracks if the player has perfect engineering", function() {
+        });
+
+        describe("land grant", function() {
+            beforeEach(function() {
+                var Cards = root.Cards;
+                game.deck = Cards.DeckFactory(
+                    Cards.MinorTypes.LAND_GRANT
+                );
+                railp.add_card(current_player, game.deck[0].id);
+                game.cards_dealt = [game.deck[0].id];
+                raila.play_action_card(game, current_player.id, game.deck[0].id);
+                railp.adjust_money(current_player, 10);
+            });
+
+            it("doesn't cost the player to build on flat land", function() {
+                raila.build_track(game, current_player.id, short_track);
+                expect(railp.get_money(current_player)).toEqual(10);
+            });
+
+            xit("building on non-flat ground still costs", function() {
+            });
+
+            xit("doesn't carry over to following turns", function() {
+            });
+        });
+
         it("adds the track to the game state", function() {
             spyOn(railg, "add_track");
             raila.build_track(game, current_player.id, short_track);
@@ -1516,6 +1549,30 @@ describe("player actions", function() {
                 expect(railp.get_score(current_player)).toEqual(4);
                 expect(game.active_cards.length).toEqual(0);
             });
+        });
+    });
+
+    describe("play_action_card", function() {
+        describe("land_grant", function() {
+            xit("isn't ready");
+        });
+    });
+
+    describe("take_action_card", function() {
+        describe("new_industry", function() {
+            xit("isn't ready");
+        });
+
+        describe("executive", function() {
+            xit("isn't ready");
+        });
+
+        describe("new_industry", function() {
+            xit("isn't ready");
+        });
+
+        describe("city_growth", function() {
+            xit("isn't ready");
         });
     });
 
