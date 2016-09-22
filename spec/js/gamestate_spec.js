@@ -461,7 +461,21 @@ describe("Game", function() {
             expect(railg.get_current_player(game)).toEqual(next_player);
         });
 
-        xit("doesn't advance to the next player if using the executive card", function() {
+        it("doesn't advance to the next player if using the executive card", function() {
+            var Cards = root.Cards;
+            game.deck = Cards.DeckFactory(
+                Cards.MinorTypes.EXECUTIVE
+            );
+            railp.add_card(current_player, game.deck[0].id);
+            game.cards_dealt = [game.deck[0].id];
+            raila.take_action_card(game, current_player.id, game.deck[0].id);
+
+            railg.end_player_turn(game, current_player.id);
+            expect(railg.get_current_player(game).id).toEqual(current_player.id);
+
+            var next_player = railg.get_next_player(game);
+            railg.end_player_turn(game, current_player.id);
+            expect(railg.get_current_player(game)).toEqual(next_player);
         });
 
         it("advances the round marker after the last player", function() {
@@ -1125,7 +1139,28 @@ describe("player actions", function() {
             expect(function() { raila.build_track(game, current_player.id, long_track); }).toThrowError(/4 hexes/);
         });
 
-        xit("allows building 5 tracks if the player has perfect engineering", function() {
+        it("allows building 5 tracks if the player has perfect engineering", function() {
+            var Cards = root.Cards;
+            game.deck = Cards.DeckFactory(
+                Cards.MinorTypes.PERFECT_ENG
+            );
+            railp.add_card(current_player, game.deck[0].id);
+            game.cards_dealt = [game.deck[0].id];
+            
+            var long_track = [
+                railf.Hex(0,2),
+                railf.Hex(0,1),
+                railf.Hex(1,0),
+                railf.Hex(2,0),
+                railf.Hex(3,0),
+                railf.Hex(4,1),
+                railf.Hex(4,2),
+            ];
+
+            spyOn(railg, "add_track");
+            raila.build_track(game, current_player.id, long_track);
+            expect(railg.add_track.calls.count()).toEqual(1);
+            expect(railg.add_track).toHaveBeenCalledWith(game, current_player.id, long_track);
         });
 
         describe("land grant", function() {
@@ -1145,7 +1180,11 @@ describe("player actions", function() {
                 expect(railp.get_money(current_player)).toEqual(10);
             });
 
-            xit("building on non-flat ground still costs", function() {
+            it("building on non-flat ground still costs", function() {
+                var map = game.map;
+                map.hexes[1][2] = railm.Terrain.RIVER;
+                raila.build_track(game, current_player.id, short_track);
+                expect(railp.get_money(current_player)).toEqual(7);
             });
 
             xit("doesn't carry over to following turns", function() {
@@ -1552,19 +1591,21 @@ describe("player actions", function() {
         });
     });
 
-    describe("play_action_card", function() {
-        describe("land_grant", function() {
-            xit("isn't ready");
-        });
-    });
-
     describe("take_action_card", function() {
-        describe("new_industry", function() {
-            xit("isn't ready");
+        var current_player;
+        beforeEach(function() {
+            current_player = railg.get_current_player(game);
         });
 
-        describe("executive", function() {
-            xit("isn't ready");
+        it("ends the player's turn", function() {
+            var Cards = root.Cards;
+            game.deck = Cards.DeckFactory(
+                Cards.MinorTypes.PERFECT_ENG
+            );
+            game.cards_dealt = [game.deck[0].id];
+
+            raila.take_action_card(game, current_player.id, game.deck[0].id);
+            expect(railg.end_player_turn.calls.count()).toEqual(1);
         });
 
         describe("new_industry", function() {

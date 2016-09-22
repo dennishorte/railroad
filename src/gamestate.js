@@ -1,4 +1,3 @@
-
 var Action  = {};
 var Cards   = {};  // Not exported
 var City    = {};
@@ -320,6 +319,7 @@ var Util    = {};
             bid     :  0,  // Used only during bidding
             cards   : [],  // Cards this player is holding (ids)
             land_grant: false,  // true if the player used a land grant card this turn.
+            executive : false,  // true if player used executive card and no other actions yet.
         };
     };
 
@@ -807,6 +807,14 @@ var Util    = {};
         return player.land_grant;
     };
 
+    Player.set_executive = function(player, value) {
+        player.executive = value;
+    };
+
+    Player.get_executive = function(player) {
+        return player.executive;
+    };
+
 }());
 
 (function() {
@@ -921,6 +929,12 @@ var Util    = {};
 
     Game.end_player_turn = function(game_state, player_id) {
         Game.ensure_player_turn(game_state, player_id);
+
+        var player = Game.get_player_by_id(game_state, player_id);
+        if (Player.get_executive(player)) {
+            Player.set_executive(player, false);
+            return;
+        }
 
         game_state.current_seat = Game.get_next_seat(game_state);
 
@@ -1478,6 +1492,17 @@ var Util    = {};
         Util.assert(Game.is_bidding_round(game_state), "It is not a bidding round.");
     };
 
+    Game.max_hexes_for_player = function(game_state, player_id) {
+        var player_cards = Game.get_cards_for_player(game_state, player_id);
+        var max_hexes = 4;
+        player_cards.forEach(function(card) {
+            if (card.minor_type == Cards.MinorTypes.PERFECT_ENG) {
+                max_hexes = 5;
+            };
+        });
+        return max_hexes;
+    };
+
 }());
 
 (function() {
@@ -1514,7 +1539,9 @@ var Util    = {};
     Action.build_track = function(game_state, player_id, path) {
         Game.ensure_player_turn(game_state, player_id);
         Util.assert(path.length >= 3, "No tracks specified.");
-        Util.assert(path.length <= 6, "Only 4 hexes of track can be built at a time.");
+
+        var max_hexes = Game.max_hexes_for_player(game_state, player_id);
+        Util.assert(path.length <= max_hexes + 2, "Only 4 hexes of track can be built at a time.");
 
         // Do this before the new track is added to the game so we don't think we're crossing
         // our own track.
@@ -1723,5 +1750,20 @@ var Util    = {};
         if (card.minor_type == Cards.MinorTypes.LAND_GRANT) {
             Player.set_land_grant(player, true);
         }
+    };
+
+    Action.take_action_card = function(game_state, player_id, card_id) {
+        Game.ensure_player_turn(game_state, player_id);
+        Game.ensure_not_land_grant(game_state, player_id);
+
+        var player = Game.get_player_by_id(game_state, player_id);
+        var card = Game.get_card_by_id(game_state, card_id);
+        
+        if (card.minor_type == Cards.MinorTypes.EXECUTIVE) {
+            Player.set_executive(player, true);
+            return;
+        }
+
+        Game.end_player_turn(game_state);
     };
 }());
