@@ -1597,6 +1597,17 @@ describe("player actions", function() {
             current_player = railg.get_current_player(game);
         });
 
+        it("fails when selecting an achievement card", function() {
+            var Cards = root.Cards;
+            game.deck = Cards.DeckFactory(
+                Cards.MinorTypes.SPEED_RECORD
+            );
+            game.cards_dealt = [game.deck[0].id];
+            expect(function() {
+                raila.take_action_card(game, current_player.id, game.deck[0].id);
+            }).toThrowError(/take achievements/);
+        });
+
         it("ends the player's turn", function() {
             var Cards = root.Cards;
             game.deck = Cards.DeckFactory(

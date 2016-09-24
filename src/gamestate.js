@@ -1759,6 +1759,8 @@ var Util    = {};
         var player = Game.get_player_by_id(game_state, player_id);
         var card = Game.get_card_by_id(game_state, card_id);
         
+        Util.assert(card.major_type != Cards.MajorTypes.ACHIEVEMENT, "Can't take achievements.");
+        
         if (card.minor_type == Cards.MinorTypes.EXECUTIVE) {
             Player.set_executive(player, true);
             return;
