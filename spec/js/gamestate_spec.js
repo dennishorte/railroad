@@ -1624,7 +1624,14 @@ describe("player actions", function() {
         });
 
         describe("city_growth", function() {
-            xit("isn't ready");
+            xit("requires a city_id option", function() {
+            });
+            
+            xit("adds cubes to the selected city", function() {
+            });
+
+            xit("ends the player's turn", function() {
+            });
         });
     });
 

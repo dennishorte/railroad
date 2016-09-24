@@ -31,6 +31,10 @@ var Util    = {};
         }
     };
 
+    Util.default_arg = function(arg, default_value) {
+        return (typeof arg !== 'undefined') ? arg : default_value;
+    };
+
     Util.not_ready = function() {
         message = "Not yet implemented.";
         if (typeof Error !== "undefined") {
@@ -1752,7 +1756,9 @@ var Util    = {};
         }
     };
 
-    Action.take_action_card = function(game_state, player_id, card_id) {
+    Action.take_action_card = function(game_state, player_id, card_id, options) {
+        Util.default_arg(options, {});
+        
         Game.ensure_player_turn(game_state, player_id);
         Game.ensure_not_land_grant(game_state, player_id);
 
