@@ -471,8 +471,9 @@ describe("Game", function() {
             game.deck = Cards.DeckFactory(
                 Cards.MinorTypes.EXECUTIVE
             );
-            railp.add_card(current_player, game.deck[0].id);
             game.cards_dealt = [game.deck[0].id];
+            game.active_cards = [game.deck[0].id];
+
             raila.take_action_card(game, current_player.id, game.deck[0].id);
 
             railg.end_player_turn(game, current_player.id);
@@ -1608,6 +1609,7 @@ describe("player actions", function() {
                 Cards.MinorTypes.SPEED_RECORD
             );
             game.cards_dealt = [game.deck[0].id];
+            game.active_cards = [game.deck[0].id];
             expect(function() {
                 raila.take_action_card(game, current_player.id, game.deck[0].id);
             }).toThrowError(/take achievements/);
@@ -1623,12 +1625,26 @@ describe("player actions", function() {
             }).toThrowError(/card is not active/);
         });
 
+        it("removes the selected card from the active cards", function() {
+            var Cards = root.Cards;
+            game.deck = Cards.DeckFactory(
+                Cards.MinorTypes.PERFECT_ENG
+            );
+            game.cards_dealt = [game.deck[0].id];
+            game.active_cards = [game.deck[0].id];
+
+            expect(railg.get_active_card_ids(game)).toContain(game.deck[0].id);
+            raila.take_action_card(game, current_player.id, game.deck[0].id);
+            expect(railg.get_active_card_ids(game)).not.toContain(game.deck[0].id);
+        });
+
         it("ends the player's turn", function() {
             var Cards = root.Cards;
             game.deck = Cards.DeckFactory(
                 Cards.MinorTypes.PERFECT_ENG
             );
             game.cards_dealt = [game.deck[0].id];
+            game.active_cards = [game.deck[0].id];
 
             raila.take_action_card(game, current_player.id, game.deck[0].id);
             expect(railg.end_player_turn.calls.count()).toEqual(1);

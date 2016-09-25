@@ -1086,7 +1086,7 @@ var Util    = {};
     /**
      Return an array of card ids that are available for players to take/achieve.
      */
-    Game.get_active_cards = function(game_state) {
+    Game.get_active_card_ids = function(game_state) {
         return game_state.active_cards;
     };
 
@@ -1769,12 +1769,16 @@ var Util    = {};
         Game.ensure_player_turn(game_state, player_id);
         Game.ensure_not_land_grant(game_state, player_id);
 
-        Util.assert(Util.Array.contains(Game.get_active_cards(game_state), card_id), "That card is not active.");
+        var active_cards = Game.get_active_card_ids(game_state);
+        Util.assert(Util.Array.contains(active_cards, card_id), "That card is not active.");
 
         var player = Game.get_player_by_id(game_state, player_id);
         var card = Game.get_card_by_id(game_state, card_id);
         
         Util.assert(card.major_type != Cards.MajorTypes.ACHIEVEMENT, "Can't take achievements.");
+
+        // Remove the card from the active cards.
+        Game.remove_active_card_id(game_state, card_id);
         
         if (card.minor_type == Cards.MinorTypes.EXECUTIVE) {
             Player.set_executive(player, true);
