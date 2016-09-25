@@ -1084,6 +1084,13 @@ var Util    = {};
     };
 
     /**
+     Return an array of card ids that are available for players to take/achieve.
+     */
+    Game.get_active_cards = function(game_state) {
+        return game_state.active_cards;
+    };
+
+    /**
      Returns an array containing the actual cards the specified player has (not just the
      card ids).
      */
@@ -1761,6 +1768,8 @@ var Util    = {};
         
         Game.ensure_player_turn(game_state, player_id);
         Game.ensure_not_land_grant(game_state, player_id);
+
+        Util.assert(Util.Array.contains(Game.get_active_cards(game_state), card_id), "That card is not active.");
 
         var player = Game.get_player_by_id(game_state, player_id);
         var card = Game.get_card_by_id(game_state, card_id);

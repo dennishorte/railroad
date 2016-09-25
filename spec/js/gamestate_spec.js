@@ -214,9 +214,14 @@ describe("Game", function() {
         game = railg.new_game(settings);
     });
 
-    xdescribe("add_card", function() {
+    describe("add_card", function() {
+        xit("hasn't been tested yet");
         // Take the top card from the deck, if any, and add it to the active_cards.
         // Don't deal cards that have already been dealt.
+    });
+
+    describe("get_available_cards", function() {
+        xit("hasn't been tested yet");
     });
     
     describe("add_track", function() {
@@ -1608,6 +1613,16 @@ describe("player actions", function() {
             }).toThrowError(/take achievements/);
         });
 
+        it("fails when selecting a card not active", function() {
+            var Cards = root.Cards;
+            game.deck = Cards.DeckFactory(
+                Cards.MinorTypes.SPEED_RECORD
+            );
+            expect(function() {
+                raila.take_action_card(game, current_player.id, game.deck[0].id);
+            }).toThrowError(/card is not active/);
+        });
+
         it("ends the player's turn", function() {
             var Cards = root.Cards;
             game.deck = Cards.DeckFactory(
@@ -1624,7 +1639,16 @@ describe("player actions", function() {
         });
 
         describe("city_growth", function() {
-            xit("requires a city_id option", function() {
+            beforeEach(function() {
+                var Cards = root.Cards;
+                game.deck = Cards.DeckFactory(
+                    Cards.MinorTypes.PERFECT_ENG
+                );
+                game.cards_dealt = [game.deck[0].id];
+            });
+
+            it("requires a city_id option", function() {
+                
             });
             
             xit("adds cubes to the selected city", function() {
