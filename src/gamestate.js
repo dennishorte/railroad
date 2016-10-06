@@ -428,6 +428,11 @@ var Util    = {};
         return count;
     };
 
+    City.add_random_cube = function(city) {
+        var color = Util.Array.select(Color.cubes);
+        city.cubes[color] += 1;
+    };
+
 }());
 
 (function() {
@@ -537,7 +542,12 @@ var Util    = {};
     };
 
     Map.get_city_by_id = function(map, city_id) {
-        return map.cities[city_id];
+        for (var i = 0; i < map.cities.length; i++) {
+            if (map.cities[i].id == city_id) {
+                return map.cities[i];
+            }
+        }
+        throw new Error("Invalid city id: " + city_id.toString());
     };
 
     Map.get_city_by_hex = function(map, hex) {
@@ -574,8 +584,7 @@ var Util    = {};
         for (var i = 0; i < Map.num_cities(map); i++) {
             var city = map.cities[i];
             for (var j = 0; j < City.get_size(city); j++) {
-                var color = Util.Array.select(Color.cubes);
-                city.cubes[color] += 1;
+                City.add_random_cube(city);
             }
         }
     };
@@ -1777,14 +1786,23 @@ var Util    = {};
         
         Util.assert(card.major_type != Cards.MajorTypes.ACHIEVEMENT, "Can't take achievements.");
 
-        // Remove the card from the active cards.
-        Game.remove_active_card_id(game_state, card_id);
-        
         if (card.minor_type == Cards.MinorTypes.EXECUTIVE) {
             Player.set_executive(player, true);
+            Game.remove_active_card_id(game_state, card_id);
             return;
         }
+        else if (card.minor_type == Cards.MinorTypes.CITY_GROWTH) {
+            Util.assert(options, "Missing options.");
+            Util.assert(options.city_id || options.city_id == 0, "Missing city_id option.");
+            
+            var city = Map.get_city_by_id(game_state.map, options.city_id);
+            
+            for (var i = 0; i < 2; i++) {
+                City.add_random_cube(city);
+            }
+        }
 
+        Game.remove_active_card_id(game_state, card_id);
         Game.end_player_turn(game_state);
     };
 }());

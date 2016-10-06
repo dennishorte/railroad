@@ -220,10 +220,6 @@ describe("Game", function() {
         // Don't deal cards that have already been dealt.
     });
 
-    describe("get_available_cards", function() {
-        xit("hasn't been tested yet");
-    });
-    
     describe("add_track", function() {
         it("fails if the player already has a track connecting these cities", function() {
             game = create_test_game_one();
@@ -1658,19 +1654,50 @@ describe("player actions", function() {
             beforeEach(function() {
                 var Cards = root.Cards;
                 game.deck = Cards.DeckFactory(
-                    Cards.MinorTypes.PERFECT_ENG
+                    Cards.MinorTypes.CITY_GROWTH
                 );
                 game.cards_dealt = [game.deck[0].id];
+                game.active_cards = [game.deck[0].id];
             });
 
-            it("requires a city_id option", function() {
-                
+            describe("options arg", function() {
+                it("must exist", function() {
+                    expect(function() {
+                        raila.take_action_card(game, current_player.id, game.deck[0].id)
+                    }).toThrowError(/missing options/i);
+                });
+
+                it("must contain 'city_id'", function() {
+                    expect(function() {
+                        raila.take_action_card(game, current_player.id, game.deck[0].id, {})
+                    }).toThrowError(/missing city_id/i);
+                })
+
+                it("city_id must be valid", function() {
+                    expect(function() {
+                        raila.take_action_card(game, current_player.id, game.deck[0].id, {
+                            city_id: 232434
+                        })
+                    }).toThrowError(/invalid city id/i);
+                });
             });
             
-            xit("adds cubes to the selected city", function() {
+            it("adds cubes to the selected city", function() {
+                var city = railm.get_city_by_id(game.map, 3);
+
+                expect(railc.num_cubes_remaining(city)).toEqual(1); // precondition
+
+                raila.take_action_card(game, current_player.id, game.deck[0].id, {
+                    city_id: 3
+                });
+                expect(railc.num_cubes_remaining(city)).toEqual(3);
             });
 
-            xit("ends the player's turn", function() {
+            it("ends the player's turn", function() {
+                raila.take_action_card(game, current_player.id, game.deck[0].id, {
+                    city_id: 0
+                });
+                expect(railg.end_player_turn).toHaveBeenCalledTimes(1);
             });
         });
     });
